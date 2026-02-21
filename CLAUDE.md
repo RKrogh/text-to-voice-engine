@@ -21,11 +21,15 @@ dotnet build
 # Run tests
 dotnet test
 
-# Run with direct playback
+# Run with Windows engine (auto-detected on Windows)
 dotnet run --project src/TextToVoice.Apps.Console -- "Hello world"
 
-# Run with file output
-dotnet run --project src/TextToVoice.Apps.Console -- "Hello world" -o output.wav
+# Run with specific engine
+dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine windows
+dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine piper --model path/to/voice.onnx
+
+# Save to file
+dotnet run --project src/TextToVoice.Apps.Console -- "Hello" -o output.wav
 
 # List available voices
 dotnet run --project src/TextToVoice.Apps.Console -- --list-voices
@@ -38,42 +42,61 @@ texttovoice/
 ├── src/
 │   ├── TextToVoice.Core/              # Interfaces and models (no platform deps)
 │   │   ├── ITtsEngine.cs              # Main TTS interface
+│   │   ├── TtsEngineFactory.cs        # Factory for creating engines
+│   │   ├── TtsEngineType.cs           # Engine type enum
 │   │   ├── VoiceInfo.cs               # Voice metadata record
 │   │   ├── TtsOptions.cs              # Configuration class
 │   │   └── AudioFormat.cs             # Output format enum
-│   ├── TextToVoice.Engines.Windows/   # Windows-specific implementation
-│   │   └── SystemSpeechEngine.cs      # Windows SAPI implementation
-│   └── TextToVoice.Apps.Console/      # Console app - CLI interface
-│       └── Program.cs                 # Entry point with System.CommandLine
+│   ├── TextToVoice.Engines.Windows/   # Windows SAPI implementation
+│   │   └── SystemSpeechEngine.cs
+│   ├── TextToVoice.Engines.Piper/     # Cross-platform Piper TTS
+│   │   ├── PiperEngine.cs
+│   │   └── PiperOptions.cs
+│   └── TextToVoice.Apps.Console/      # CLI application
+│       └── Program.cs
 ├── tests/
 │   └── TextToVoice.Core.Tests/        # Unit tests (xUnit)
 ├── TextToVoice.sln
 ├── README.md
 ├── CLAUDE.md
-└── REQUIREMENTS.md                    # Living requirements document
+└── REQUIREMENTS.md
 ```
 
 ### Key Interfaces
 
-- **ITtsEngine** - Main abstraction for TTS engines, supports:
+- **ITtsEngine** - Main abstraction for TTS engines:
   - `SpeakAsync()` - Direct playback
   - `SynthesizeToAudioAsync()` - Get audio bytes
   - `SaveToFileAsync()` - Export to file
   - Voice selection, rate, and volume control
 
+- **TtsEngineFactory** - Creates engines by type with auto-detection:
+  - `Register(type, factory)` - Register an engine
+  - `Create(type)` - Create engine instance
+  - `Parse(name)` - Parse string to engine type
+
 ### Project Naming Convention
 
 - **TextToVoice.Core** - Interfaces and models (platform-agnostic)
-- **TextToVoice.Engines.*** - Engine implementations (e.g., Windows, Piper)
-- **TextToVoice.Apps.*** - Consumer applications (e.g., Console, GUI)
+- **TextToVoice.Engines.*** - Engine implementations
+- **TextToVoice.Apps.*** - Consumer applications
 
-### Platform Implementations
+### Available Engines
 
-- **TextToVoice.Engines.Windows** - Windows implementation using System.Speech (SAPI)
-- **TextToVoice.Engines.Piper** - (Future) Cross-platform using Piper TTS
+| Engine | Platform | Status | Notes |
+|--------|----------|--------|-------|
+| Windows | Windows | ✓ Done | System.Speech (SAPI) |
+| Piper | Cross-platform | ✓ Done | Requires piper executable + model |
+| ElevenLabs | Cloud | Planned | High quality, API-based |
+
+### Piper Setup
+
+1. Download Piper from https://github.com/rhasspy/piper/releases
+2. Download voice model from https://huggingface.co/rhasspy/piper-voices
+3. Run: `texttovoice "Hello" --engine piper --model path/to/voice.onnx`
 
 ### Dependencies
 
 - .NET 10
-- System.Speech (Windows TTS) - in TextToVoice.Engines.Windows
-- System.CommandLine (CLI parsing) - in TextToVoice.Apps.Console
+- System.Speech (in Engines.Windows)
+- System.CommandLine (in Apps.Console)
