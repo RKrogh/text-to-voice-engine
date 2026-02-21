@@ -26,7 +26,7 @@ dotnet run --project src/TextToVoice.Apps.Console -- "Hello world"
 
 # Run with specific engine
 dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine windows
-dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine piper --model path/to/voice.onnx
+dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine piper --model path/to/voice.onnx --piper-path path/to/piper.exe
 
 # Save to file
 dotnet run --project src/TextToVoice.Apps.Console -- "Hello" -o output.wav
@@ -53,7 +53,8 @@ texttovoice/
 │   │   ├── PiperEngine.cs
 │   │   └── PiperOptions.cs
 │   └── TextToVoice.Apps.Console/      # CLI application
-│       └── Program.cs
+│       ├── Program.cs
+│       └── AppSettings.cs             # Settings file model
 ├── tests/
 │   └── TextToVoice.Core.Tests/        # Unit tests (xUnit)
 ├── TextToVoice.sln
@@ -89,11 +90,15 @@ texttovoice/
 | Piper | Cross-platform | ✓ Done | Requires piper executable + model |
 | ElevenLabs | Cloud | Planned | High quality, API-based |
 
+### Settings File
+
+Place `settings.json` next to the executable (`AppContext.BaseDirectory`) to set defaults. CLI args override settings. See `AppSettings.cs` for the model. The file is gitignored.
+
 ### Piper Setup
 
 1. Download Piper from https://github.com/rhasspy/piper/releases
 2. Download voice model from https://huggingface.co/rhasspy/piper-voices
-3. Run: `texttovoice "Hello" --engine piper --model path/to/voice.onnx`
+3. Run: `texttovoice "Hello" --engine piper --model path/to/voice.onnx --piper-path path/to/piper.exe`
 
 ### Dependencies
 
