@@ -12,6 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="settings.json" Condition="Exists('settings.json')" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TextToVoice.Core\TextToVoice.Core.csproj" />
     <ProjectReference Include="..\TextToVoice.Engines.Windows\TextToVoice.Engines.Windows.csproj" />
     <ProjectReference Include="..\TextToVoice.Engines.Piper\TextToVoice.Engines.Piper.csproj" />
