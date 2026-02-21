@@ -15,6 +15,9 @@ packages/
 *.suo
 *.sln.docstates
 
+# Claude
+settings.local.json
+
 # Visual Studio
 .vs/
 *.rsuser
