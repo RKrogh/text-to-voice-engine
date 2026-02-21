@@ -1,7 +1,22 @@
 using System.CommandLine;
+using System.Text.Json;
+using TextToVoice.Apps.Console;
 using TextToVoice.Core;
 using TextToVoice.Engines.Piper;
 using TextToVoice.Engines.Windows;
+
+// Load settings from settings.json next to the executable
+var settingsPath = Path.Combine(AppContext.BaseDirectory, "settings.json");
+AppSettings settings;
+if (File.Exists(settingsPath))
+{
+    var json = File.ReadAllText(settingsPath);
+    settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+}
+else
+{
+    settings = new AppSettings();
+}
 
 // Register available engines
 if (OperatingSystem.IsWindows())
@@ -74,112 +89,150 @@ var rootCommand = new RootCommand("Text-to-voice synthesizer")
     piperPathOption,
 };
 
-rootCommand.SetHandler(async (context) =>
-{
-    var text = context.ParseResult.GetValueForArgument(textArgument);
-    var output = context.ParseResult.GetValueForOption(outputOption);
-    var voice = context.ParseResult.GetValueForOption(voiceOption);
-    var rate = context.ParseResult.GetValueForOption(rateOption);
-    var volume = context.ParseResult.GetValueForOption(volumeOption);
-    var listVoices = context.ParseResult.GetValueForOption(listVoicesOption);
-    var engineName = context.ParseResult.GetValueForOption(engineOption);
-    var modelPath = context.ParseResult.GetValueForOption(modelOption);
-    var piperPath = context.ParseResult.GetValueForOption(piperPathOption);
-
-    var engineType = TtsEngineFactory.Parse(engineName);
-
-    // Register Piper if model provided or Piper explicitly requested
-    if (!string.IsNullOrEmpty(modelPath))
+rootCommand.SetHandler(
+    async (context) =>
     {
-        TtsEngineFactory.Register(TtsEngineType.Piper, () => new PiperEngine(
-            new PiperOptions { ModelPath = modelPath, ExecutablePath = piperPath }));
-    }
+        var parseResult = context.ParseResult;
 
-    // Validate Piper has model if explicitly requested
-    if (engineType == TtsEngineType.Piper && string.IsNullOrEmpty(modelPath))
-    {
-        Console.Error.WriteLine("Error: Piper engine requires --model path to .onnx file");
-        context.ExitCode = 1;
-        return;
-    }
+        // Merge CLI args with settings — CLI takes precedence
+        var text = parseResult.GetValueForArgument(textArgument);
+        var output = parseResult.GetValueForOption(outputOption);
+        var listVoices = parseResult.GetValueForOption(listVoicesOption);
 
-    ITtsEngine engine;
-    try
-    {
-        engine = TtsEngineFactory.Create(engineType);
-    }
-    catch (InvalidOperationException ex)
-    {
-        Console.Error.WriteLine($"Error: {ex.Message}");
-        Console.Error.WriteLine("Available engines: " +
-            string.Join(", ", TtsEngineFactory.GetAvailableTypes()));
-        context.ExitCode = 1;
-        return;
-    }
+        var engineName = parseResult.FindResultFor(engineOption) is not null
+            ? parseResult.GetValueForOption(engineOption)
+            : settings.Engine;
 
-    using (engine)
-    {
-        if (listVoices)
+        var voice = parseResult.FindResultFor(voiceOption) is not null
+            ? parseResult.GetValueForOption(voiceOption)
+            : settings.Voice;
+
+        var rate = parseResult.FindResultFor(rateOption) is not null
+            ? parseResult.GetValueForOption(rateOption)
+            : settings.Rate ?? 0;
+
+        var volume = parseResult.FindResultFor(volumeOption) is not null
+            ? parseResult.GetValueForOption(volumeOption)
+            : settings.Volume ?? 100;
+
+        var modelPath = parseResult.FindResultFor(modelOption) is not null
+            ? parseResult.GetValueForOption(modelOption)
+            : settings.Piper?.ModelPath;
+
+        var piperPath = parseResult.FindResultFor(piperPathOption) is not null
+            ? parseResult.GetValueForOption(piperPathOption)
+            : settings.Piper?.ExecutablePath;
+
+        var engineType = TtsEngineFactory.Parse(engineName);
+
+        // Register Piper if model provided or Piper explicitly requested
+        if (!string.IsNullOrEmpty(modelPath))
         {
-            var voices = engine.GetAvailableVoices();
-            Console.WriteLine("Available voices:");
-            Console.WriteLine();
-            foreach (var v in voices)
-            {
-                Console.WriteLine($"  {v.Name}");
-                Console.WriteLine($"    Culture: {v.Culture}");
-                Console.WriteLine($"    Gender:  {v.Gender}");
-                Console.WriteLine();
-            }
-            return;
+            TtsEngineFactory.Register(
+                TtsEngineType.Piper,
+                () =>
+                    new PiperEngine(
+                        new PiperOptions { ModelPath = modelPath, ExecutablePath = piperPath }
+                    )
+            );
         }
 
-        if (string.IsNullOrWhiteSpace(text))
+        // Validate Piper has model if explicitly requested
+        if (engineType == TtsEngineType.Piper && string.IsNullOrEmpty(modelPath))
         {
-            Console.Error.WriteLine("Error: No text provided. Use --help for usage information.");
+            Console.Error.WriteLine("Error: Piper engine requires --model path to .onnx file");
+            Console.Error.WriteLine(
+                "Provide --model on the command line or set piper.modelPath in settings.json"
+            );
             context.ExitCode = 1;
             return;
         }
 
-        if (!string.IsNullOrEmpty(voice))
+        ITtsEngine engine;
+        try
         {
-            try
+            engine = TtsEngineFactory.Create(engineType);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Console.Error.WriteLine($"Error: {ex.Message}");
+            Console.Error.WriteLine(
+                "Available engines: " + string.Join(", ", TtsEngineFactory.GetAvailableTypes())
+            );
+            context.ExitCode = 1;
+            return;
+        }
+
+        using (engine)
+        {
+            if (listVoices)
             {
-                engine.SetVoice(voice);
+                var voices = engine.GetAvailableVoices();
+                Console.WriteLine("Available voices:");
+                Console.WriteLine();
+                foreach (var v in voices)
+                {
+                    Console.WriteLine($"  {v.Name}");
+                    Console.WriteLine($"    Culture: {v.Culture}");
+                    Console.WriteLine($"    Gender:  {v.Gender}");
+                    Console.WriteLine();
+                }
+                return;
             }
-            catch (NotSupportedException)
+
+            if (string.IsNullOrWhiteSpace(text))
             {
-                Console.Error.WriteLine($"Warning: This engine doesn't support voice switching at runtime.");
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error: Could not select voice '{voice}': {ex.Message}");
+                Console.Error.WriteLine(
+                    "Error: No text provided. Use --help for usage information."
+                );
                 context.ExitCode = 1;
                 return;
             }
-        }
 
-        engine.SetRate(rate);
-        engine.SetVolume(volume);
+            if (!string.IsNullOrEmpty(voice))
+            {
+                try
+                {
+                    engine.SetVoice(voice);
+                }
+                catch (NotSupportedException)
+                {
+                    Console.Error.WriteLine(
+                        $"Warning: This engine doesn't support voice switching at runtime."
+                    );
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine(
+                        $"Error: Could not select voice '{voice}': {ex.Message}"
+                    );
+                    context.ExitCode = 1;
+                    return;
+                }
+            }
 
-        try
-        {
-            if (!string.IsNullOrEmpty(output))
+            engine.SetRate(rate);
+            engine.SetVolume(volume);
+
+            try
             {
-                await engine.SaveToFileAsync(text, output);
-                Console.WriteLine($"Audio saved to: {output}");
+                if (!string.IsNullOrEmpty(output))
+                {
+                    await engine.SaveToFileAsync(text, output);
+                    Console.WriteLine($"Audio saved to: {output}");
+                }
+                else
+                {
+                    await engine.SpeakAsync(text);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                await engine.SpeakAsync(text);
+                Console.Error.WriteLine($"Error: {ex.Message}");
+                context.ExitCode = 1;
             }
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Error: {ex.Message}");
-            context.ExitCode = 1;
         }
     }
-});
+);
 
 return await rootCommand.InvokeAsync(args);

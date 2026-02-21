@@ -6,7 +6,7 @@ Living requirements document for the text-to-voice module.
 
 ### Platform
 - [x] Windows support (primary)
-- [ ] Cross-platform support (future)
+- [x] Cross-platform support (Piper engine)
 
 ### Output
 - [x] Direct audio playback
@@ -34,7 +34,7 @@ Living requirements document for the text-to-voice module.
 - [ ] Azure Cognitive Services integration
 - [ ] Google Cloud TTS integration
 - [ ] Amazon Polly integration
-- [ ] Piper TTS (offline, cross-platform)
+- [x] Piper TTS (offline, cross-platform)
 - [ ] eSpeak (lightweight, cross-platform)
 
 ### Additional Output Formats

@@ -18,6 +18,9 @@ packages/
 # Claude
 settings.local.json
 
+# App settings (contains user-specific paths)
+settings.json
+
 # Visual Studio
 .vs/
 *.rsuser
