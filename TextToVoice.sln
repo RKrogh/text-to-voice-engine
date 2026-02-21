@@ -5,9 +5,9 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TextToVoice.Core", "src\TextToVoice.Core\TextToVoice.Core.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TextToVoice.Windows", "src\TextToVoice.Windows\TextToVoice.Windows.csproj", "{D4E5F6A7-B8C9-0123-DEF0-234567890123}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TextToVoice.Engines.Windows", "src\TextToVoice.Engines.Windows\TextToVoice.Engines.Windows.csproj", "{D4E5F6A7-B8C9-0123-DEF0-234567890123}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TextToVoice.Console", "src\TextToVoice.Console\TextToVoice.Console.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TextToVoice.Apps.Console", "src\TextToVoice.Apps.Console\TextToVoice.Apps.Console.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TextToVoice.Core.Tests", "tests\TextToVoice.Core.Tests\TextToVoice.Core.Tests.csproj", "{C3D4E5F6-A7B8-9012-CDEF-123456789012}"
 EndProject

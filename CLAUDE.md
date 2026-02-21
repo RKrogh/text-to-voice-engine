@@ -22,13 +22,13 @@ dotnet build
 dotnet test
 
 # Run with direct playback
-dotnet run --project src/TextToVoice.Console -- "Hello world"
+dotnet run --project src/TextToVoice.Apps.Console -- "Hello world"
 
 # Run with file output
-dotnet run --project src/TextToVoice.Console -- "Hello world" -o output.wav
+dotnet run --project src/TextToVoice.Apps.Console -- "Hello world" -o output.wav
 
 # List available voices
-dotnet run --project src/TextToVoice.Console -- --list-voices
+dotnet run --project src/TextToVoice.Apps.Console -- --list-voices
 ```
 
 ## Architecture
@@ -36,21 +36,21 @@ dotnet run --project src/TextToVoice.Console -- --list-voices
 ```
 texttovoice/
 ├── src/
-│   ├── TextToVoice.Core/           # Interfaces and models (no platform deps)
-│   │   ├── ITtsEngine.cs           # Main TTS interface
-│   │   ├── VoiceInfo.cs            # Voice metadata record
-│   │   ├── TtsOptions.cs           # Configuration class
-│   │   └── AudioFormat.cs          # Output format enum
-│   ├── TextToVoice.Windows/        # Windows-specific implementation
-│   │   └── SystemSpeechEngine.cs   # Windows SAPI implementation
-│   └── TextToVoice.Console/        # Console app - CLI interface
-│       └── Program.cs              # Entry point with System.CommandLine
+│   ├── TextToVoice.Core/              # Interfaces and models (no platform deps)
+│   │   ├── ITtsEngine.cs              # Main TTS interface
+│   │   ├── VoiceInfo.cs               # Voice metadata record
+│   │   ├── TtsOptions.cs              # Configuration class
+│   │   └── AudioFormat.cs             # Output format enum
+│   ├── TextToVoice.Engines.Windows/   # Windows-specific implementation
+│   │   └── SystemSpeechEngine.cs      # Windows SAPI implementation
+│   └── TextToVoice.Apps.Console/      # Console app - CLI interface
+│       └── Program.cs                 # Entry point with System.CommandLine
 ├── tests/
-│   └── TextToVoice.Core.Tests/     # Unit tests (xUnit)
+│   └── TextToVoice.Core.Tests/        # Unit tests (xUnit)
 ├── TextToVoice.sln
 ├── README.md
 ├── CLAUDE.md
-└── REQUIREMENTS.md                 # Living requirements document
+└── REQUIREMENTS.md                    # Living requirements document
 ```
 
 ### Key Interfaces
@@ -61,13 +61,19 @@ texttovoice/
   - `SaveToFileAsync()` - Export to file
   - Voice selection, rate, and volume control
 
+### Project Naming Convention
+
+- **TextToVoice.Core** - Interfaces and models (platform-agnostic)
+- **TextToVoice.Engines.*** - Engine implementations (e.g., Windows, Piper)
+- **TextToVoice.Apps.*** - Consumer applications (e.g., Console, GUI)
+
 ### Platform Implementations
 
-- **TextToVoice.Windows** - Windows implementation using System.Speech (SAPI)
-- **TextToVoice.Piper** - (Future) Cross-platform using Piper TTS
+- **TextToVoice.Engines.Windows** - Windows implementation using System.Speech (SAPI)
+- **TextToVoice.Engines.Piper** - (Future) Cross-platform using Piper TTS
 
 ### Dependencies
 
 - .NET 10
-- System.Speech (Windows TTS) - in TextToVoice.Windows
-- System.CommandLine (CLI parsing) - in TextToVoice.Console
+- System.Speech (Windows TTS) - in TextToVoice.Engines.Windows
+- System.CommandLine (CLI parsing) - in TextToVoice.Apps.Console

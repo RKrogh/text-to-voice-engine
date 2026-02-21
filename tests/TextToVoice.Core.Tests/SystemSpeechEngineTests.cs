@@ -1,5 +1,6 @@
 using System.Runtime.Versioning;
-using TextToVoice.Windows;
+using TextToVoice.Core;
+using TextToVoice.Engines.Windows;
 
 namespace TextToVoice.Core.Tests;
 

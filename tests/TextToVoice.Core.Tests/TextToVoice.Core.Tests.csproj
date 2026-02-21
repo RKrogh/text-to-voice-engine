@@ -17,7 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TextToVoice.Core\TextToVoice.Core.csproj" />
-    <ProjectReference Include="..\..\src\TextToVoice.Windows\TextToVoice.Windows.csproj" />
+    <ProjectReference Include="..\..\src\TextToVoice.Engines.Windows\TextToVoice.Engines.Windows.csproj" />
   </ItemGroup>
 
   <ItemGroup>
