@@ -36,13 +36,13 @@ dotnet run --project src/TextToVoice.Console -- --list-voices
 ```
 texttovoice/
 ├── src/
-│   ├── TextToVoice.Core/           # Class library - interfaces and models
+│   ├── TextToVoice.Core/           # Interfaces and models (no platform deps)
 │   │   ├── ITtsEngine.cs           # Main TTS interface
 │   │   ├── VoiceInfo.cs            # Voice metadata record
 │   │   ├── TtsOptions.cs           # Configuration class
-│   │   ├── AudioFormat.cs          # Output format enum
-│   │   └── Engines/
-│   │       └── SystemSpeechEngine.cs  # Windows SAPI implementation
+│   │   └── AudioFormat.cs          # Output format enum
+│   ├── TextToVoice.Windows/        # Windows-specific implementation
+│   │   └── SystemSpeechEngine.cs   # Windows SAPI implementation
 │   └── TextToVoice.Console/        # Console app - CLI interface
 │       └── Program.cs              # Entry point with System.CommandLine
 ├── tests/
@@ -61,12 +61,13 @@ texttovoice/
   - `SaveToFileAsync()` - Export to file
   - Voice selection, rate, and volume control
 
-### Current Implementation
+### Platform Implementations
 
-- **SystemSpeechEngine** - Windows implementation using System.Speech (SAPI)
+- **TextToVoice.Windows** - Windows implementation using System.Speech (SAPI)
+- **TextToVoice.Piper** - (Future) Cross-platform using Piper TTS
 
 ### Dependencies
 
 - .NET 10
-- System.Speech (Windows TTS)
-- System.CommandLine (CLI parsing)
+- System.Speech (Windows TTS) - in TextToVoice.Windows
+- System.CommandLine (CLI parsing) - in TextToVoice.Console
