@@ -42,7 +42,10 @@ Living requirements document for the text-to-voice module.
 - [ ] OGG export
 
 ### Additional Features
-- [ ] SSML support
+- [x] SSML support (native on Windows, preprocessed on Piper)
+- [x] Settings file for persistent defaults
+- [ ] SSML namespace auto-normalization (Windows requires full xmlns)
+- [ ] ElevenLabs cloud engine
 - [ ] Streaming audio
 - [ ] Voice caching
 - [ ] Multiple language support

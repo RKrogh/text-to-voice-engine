@@ -1,3 +1,4 @@
+using TextToVoice.Core;
 using TextToVoice.Engines.Piper;
 
 namespace TextToVoice.Core.Tests;
@@ -64,6 +65,13 @@ public class PiperEngineTests
         using var engine = new PiperEngine(new PiperOptions { ModelPath = "voice.onnx" });
 
         Assert.Throws<NotSupportedException>(() => engine.SetVoice("any"));
+    }
+
+    [Fact]
+    public void SupportsNativeSsml_ReturnsFalse()
+    {
+        using var engine = new PiperEngine(new PiperOptions { ModelPath = "voice.onnx" });
+        Assert.False(((ISsmlCapable)engine).SupportsNativeSsml);
     }
 
     [Fact]

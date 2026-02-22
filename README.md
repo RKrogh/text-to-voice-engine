@@ -8,6 +8,7 @@ A C# text-to-voice module designed as part of a larger pipeline: voice-to-text â
 - Export to WAV files
 - Multiple voice support
 - Adjustable speech rate and volume
+- SSML support (native on Windows, preprocessed on Piper)
 - Interface-based design with pluggable engines
 - Settings file for persistent defaults
 
@@ -64,6 +65,20 @@ dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine windows
 dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine piper --model path/to/voice.onnx --piper-path path/to/piper.exe
 ```
 
+### SSML input
+
+SSML is auto-detected when input starts with `<speak>`, or use `--ssml` explicitly.
+
+```bash
+# Auto-detected SSML (Windows requires full xmlns namespace)
+dotnet run --project src/TextToVoice.Apps.Console -- "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>Hello<break time='500ms'/><prosody rate='slow'>world</prosody></speak>"
+
+# Explicit --ssml flag
+dotnet run --project src/TextToVoice.Apps.Console -- --ssml "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>Hello world</speak>"
+```
+
+**Note:** The Windows engine supports SSML natively but requires the full `xmlns` namespace in the `<speak>` tag. The Piper engine preprocesses SSML â€” it extracts breaks (as pauses), prosody rate/volume, and voice hints, then speaks the plain text.
+
 ## Command Line Options
 
 | Option | Description |
@@ -77,6 +92,7 @@ dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine piper --mo
 | `-e, --engine <name>` | TTS engine: auto, windows, piper |
 | `-m, --model <path>` | Path to Piper model file (.onnx) |
 | `--piper-path <path>` | Path to Piper executable |
+| `--ssml` | Treat input as SSML (auto-detected if starts with `<speak>`) |
 
 ## Settings File
 

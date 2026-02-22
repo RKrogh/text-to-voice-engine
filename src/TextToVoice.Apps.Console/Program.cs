@@ -76,6 +76,11 @@ var piperPathOption = new Option<string?>(
     description: "Path to the Piper executable (defaults to 'piper' in PATH)"
 );
 
+var ssmlOption = new Option<bool>(
+    aliases: ["--ssml"],
+    description: "Treat input as SSML markup (auto-detected if input starts with <speak>)"
+);
+
 var rootCommand = new RootCommand("Text-to-voice synthesizer")
 {
     textArgument,
@@ -87,6 +92,7 @@ var rootCommand = new RootCommand("Text-to-voice synthesizer")
     engineOption,
     modelOption,
     piperPathOption,
+    ssmlOption,
 };
 
 rootCommand.SetHandler(
@@ -214,16 +220,51 @@ rootCommand.SetHandler(
             engine.SetRate(rate);
             engine.SetVolume(volume);
 
+            // Detect SSML input
+            var isSsml = parseResult.GetValueForOption(ssmlOption);
+            if (!isSsml)
+                isSsml = SsmlDetector.IsSsml(text);
+
             try
             {
-                if (!string.IsNullOrEmpty(output))
+                if (isSsml && engine is ISsmlCapable ssmlEngine)
                 {
-                    await engine.SaveToFileAsync(text, output);
-                    Console.WriteLine($"Audio saved to: {output}");
+                    if (!string.IsNullOrEmpty(output))
+                    {
+                        await ssmlEngine.SaveSsmlToFileAsync(text, output);
+                        Console.WriteLine($"Audio saved to: {output}");
+                    }
+                    else
+                    {
+                        await ssmlEngine.SpeakSsmlAsync(text);
+                    }
+                }
+                else if (isSsml)
+                {
+                    Console.Error.WriteLine(
+                        "Warning: Selected engine does not support SSML. Speaking as plain text."
+                    );
+                    if (!string.IsNullOrEmpty(output))
+                    {
+                        await engine.SaveToFileAsync(text, output);
+                        Console.WriteLine($"Audio saved to: {output}");
+                    }
+                    else
+                    {
+                        await engine.SpeakAsync(text);
+                    }
                 }
                 else
                 {
-                    await engine.SpeakAsync(text);
+                    if (!string.IsNullOrEmpty(output))
+                    {
+                        await engine.SaveToFileAsync(text, output);
+                        Console.WriteLine($"Audio saved to: {output}");
+                    }
+                    else
+                    {
+                        await engine.SpeakAsync(text);
+                    }
                 }
             }
             catch (Exception ex)

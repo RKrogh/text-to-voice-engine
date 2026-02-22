@@ -8,7 +8,7 @@ namespace TextToVoice.Engines.Windows;
 /// Windows TTS engine using the built-in System.Speech (SAPI) synthesizer.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public class SystemSpeechEngine : ITtsEngine
+public class SystemSpeechEngine : ITtsEngine, ISsmlCapable
 {
     private readonly SpeechSynthesizer _synthesizer;
     private bool _disposed;
@@ -117,6 +117,69 @@ public class SystemSpeechEngine : ITtsEngine
     public void SetVolume(int volume)
     {
         _synthesizer.Volume = Math.Clamp(volume, 0, 100);
+    }
+
+    public bool SupportsNativeSsml => true;
+
+    public Task SpeakSsmlAsync(string ssml, CancellationToken cancellationToken = default)
+    {
+        return Task.Run(
+            () =>
+            {
+                var prompt = _synthesizer.SpeakSsmlAsync(ssml);
+
+                while (!prompt.IsCompleted)
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        _synthesizer.SpeakAsyncCancelAll();
+                        cancellationToken.ThrowIfCancellationRequested();
+                    }
+                    Thread.Sleep(50);
+                }
+            },
+            cancellationToken
+        );
+    }
+
+    public Task<byte[]> SynthesizeSsmlToAudioAsync(
+        string ssml,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return Task.Run(
+            () =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                using var stream = new MemoryStream();
+                _synthesizer.SetOutputToWaveStream(stream);
+                _synthesizer.SpeakSsml(ssml);
+                _synthesizer.SetOutputToDefaultAudioDevice();
+
+                return stream.ToArray();
+            },
+            cancellationToken
+        );
+    }
+
+    public Task SaveSsmlToFileAsync(
+        string ssml,
+        string filePath,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return Task.Run(
+            () =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                _synthesizer.SetOutputToWaveFile(filePath);
+                _synthesizer.SpeakSsml(ssml);
+                _synthesizer.SetOutputToDefaultAudioDevice();
+            },
+            cancellationToken
+        );
     }
 
     public void Dispose()

@@ -7,13 +7,14 @@ namespace TextToVoice.Engines.Piper;
 /// Cross-platform TTS engine using Piper (https://github.com/rhasspy/piper).
 /// Requires Piper executable and voice model to be installed.
 /// </summary>
-public class PiperEngine : ITtsEngine
+public class PiperEngine : ITtsEngine, ISsmlCapable
 {
     private readonly PiperOptions _options;
     private readonly string _executable;
+    private readonly ISsmlPreprocessor _preprocessor;
     private bool _disposed;
 
-    public PiperEngine(PiperOptions options)
+    public PiperEngine(PiperOptions options, ISsmlPreprocessor? preprocessor = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
 
@@ -21,6 +22,7 @@ public class PiperEngine : ITtsEngine
             throw new ArgumentException("ModelPath is required", nameof(options));
 
         _executable = options.ExecutablePath ?? "piper";
+        _preprocessor = preprocessor ?? new SsmlPreprocessor();
     }
 
     public async Task SpeakAsync(string text, CancellationToken cancellationToken = default)
@@ -131,6 +133,48 @@ public class PiperEngine : ITtsEngine
     {
         // Piper doesn't support volume control directly
         // Would need post-processing or system volume
+    }
+
+    public bool SupportsNativeSsml => false;
+
+    public Task SpeakSsmlAsync(string ssml, CancellationToken cancellationToken = default)
+    {
+        var result = _preprocessor.Preprocess(ssml);
+        ApplyPreprocessResult(result);
+        return SpeakAsync(result.PlainText, cancellationToken);
+    }
+
+    public Task<byte[]> SynthesizeSsmlToAudioAsync(
+        string ssml,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var result = _preprocessor.Preprocess(ssml);
+        ApplyPreprocessResult(result);
+        return SynthesizeToAudioAsync(result.PlainText, cancellationToken);
+    }
+
+    public Task SaveSsmlToFileAsync(
+        string ssml,
+        string filePath,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var result = _preprocessor.Preprocess(ssml);
+        ApplyPreprocessResult(result);
+        return SaveToFileAsync(result.PlainText, filePath, cancellationToken);
+    }
+
+    private void ApplyPreprocessResult(SsmlPreprocessResult result)
+    {
+        if (result.RateMultiplier.HasValue)
+        {
+            // Piper length_scale: 1.0 = normal, <1.0 = faster, >1.0 = slower
+            // SSML rate multiplier: 1.0 = normal, >1.0 = faster, <1.0 = slower
+            // Invert: length_scale = 1.0 / rateMultiplier
+            _options.LengthScale = 1.0f / result.RateMultiplier.Value;
+        }
+        // Volume: Piper doesn't support this natively
     }
 
     public void Dispose()

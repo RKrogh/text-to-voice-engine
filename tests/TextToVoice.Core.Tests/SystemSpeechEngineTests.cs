@@ -172,6 +172,28 @@ public class SystemSpeechEngineTests
     }
 
     [WindowsOnlyFact]
+    public void SupportsNativeSsml_ReturnsTrue()
+    {
+        using var engine = new SystemSpeechEngine();
+        Assert.True(((ISsmlCapable)engine).SupportsNativeSsml);
+    }
+
+    [WindowsOnlyFact]
+    public async Task SynthesizeSsmlToAudioAsync_ReturnsWavData()
+    {
+        using var engine = new SystemSpeechEngine();
+        var ssml = SsmlDetector.WrapInSsml("Hello SSML world");
+        var audioData = await engine.SynthesizeSsmlToAudioAsync(ssml);
+
+        Assert.NotNull(audioData);
+        Assert.NotEmpty(audioData);
+        Assert.Equal((byte)'R', audioData[0]);
+        Assert.Equal((byte)'I', audioData[1]);
+        Assert.Equal((byte)'F', audioData[2]);
+        Assert.Equal((byte)'F', audioData[3]);
+    }
+
+    [WindowsOnlyFact]
     public void Dispose_CanBeCalledMultipleTimes()
     {
         var engine = new SystemSpeechEngine();
