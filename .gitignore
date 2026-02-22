@@ -50,3 +50,9 @@ Thumbs.db
 # Generated audio files
 *.wav
 *.mp3
+
+# TTS model files and data
+vits-piper-*/
+espeak-ng-data/
+*.onnx
+*.tar.bz2
