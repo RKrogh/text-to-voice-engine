@@ -20,6 +20,8 @@ settings.local.json
 
 # App settings (contains user-specific paths)
 settings.json
+appsettings.Development.json
+appsettings.Local.json
 
 # Visual Studio
 .vs/

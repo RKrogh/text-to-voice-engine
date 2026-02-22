@@ -17,6 +17,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{2E4415FA-CBF
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TextToVoice.Engines.SherpaOnnx", "src\TextToVoice.Engines.SherpaOnnx\TextToVoice.Engines.SherpaOnnx.csproj", "{A1D7A794-1113-4CEE-BB42-BF60BD035062}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TextToVoice.Engines.ElevenLabs", "src\TextToVoice.Engines.ElevenLabs\TextToVoice.Engines.ElevenLabs.csproj", "{8709B480-9008-43E8-B765-58C66A7C4601}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -47,8 +49,13 @@ Global
 		{A1D7A794-1113-4CEE-BB42-BF60BD035062}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1D7A794-1113-4CEE-BB42-BF60BD035062}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1D7A794-1113-4CEE-BB42-BF60BD035062}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8709B480-9008-43E8-B765-58C66A7C4601}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8709B480-9008-43E8-B765-58C66A7C4601}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8709B480-9008-43E8-B765-58C66A7C4601}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8709B480-9008-43E8-B765-58C66A7C4601}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{A1D7A794-1113-4CEE-BB42-BF60BD035062} = {2E4415FA-CBF4-49E0-AAEB-DD8FD7E00532}
+		{8709B480-9008-43E8-B765-58C66A7C4601} = {2E4415FA-CBF4-49E0-AAEB-DD8FD7E00532}
 	EndGlobalSection
 EndGlobal

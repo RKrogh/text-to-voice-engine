@@ -1,23 +1,24 @@
 using System.CommandLine;
-using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using TextToVoice.Apps.Console;
 using TextToVoice.Core;
+using TextToVoice.Engines.ElevenLabs;
 using TextToVoice.Engines.Piper;
 using TextToVoice.Engines.SherpaOnnx;
 using TextToVoice.Engines.Windows;
 
-// Load settings from settings.json next to the executable
-var settingsPath = Path.Combine(AppContext.BaseDirectory, "settings.json");
-AppSettings settings;
-if (File.Exists(settingsPath))
-{
-    var json = File.ReadAllText(settingsPath);
-    settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
-}
-else
-{
-    settings = new AppSettings();
-}
+// Build configuration: appsettings.json → appsettings.{env}.json → user secrets → env vars
+// CLI args (System.CommandLine) override everything in the handler below.
+var environment = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ?? "Production";
+var config = new ConfigurationBuilder()
+    .SetBasePath(AppContext.BaseDirectory)
+    .AddJsonFile("appsettings.json", optional: true)
+    .AddJsonFile($"appsettings.{environment}.json", optional: true)
+    .AddUserSecrets(typeof(AppSettings).Assembly, optional: true)
+    .AddEnvironmentVariables("TTV_")
+    .Build();
+
+var settings = config.Get<AppSettings>() ?? new AppSettings();
 
 // Register available engines
 if (OperatingSystem.IsWindows())
@@ -64,7 +65,7 @@ var listVoicesOption = new Option<bool>(
 
 var engineOption = new Option<string?>(
     aliases: ["-e", "--engine"],
-    description: "TTS engine to use (auto, windows, piper, sherpaonnx)"
+    description: "TTS engine to use (auto, windows, piper, sherpaonnx, elevenlabs)"
 );
 
 var modelOption = new Option<string?>(
@@ -92,6 +93,11 @@ var leadingSilenceOption = new Option<int?>(
     description: "Milliseconds of silence before playback to prevent clipping (default: 150, 0 to disable)"
 );
 
+var apiKeyOption = new Option<string?>(
+    aliases: ["--api-key"],
+    description: "API key for ElevenLabs engine (also: settings elevenlabs.apiKey or ELEVENLABS_API_KEY env var)"
+);
+
 var ssmlOption = new Option<bool>(
     aliases: ["--ssml"],
     description: "Treat input as SSML markup (auto-detected if input starts with <speak>)"
@@ -111,6 +117,7 @@ var rootCommand = new RootCommand("Text-to-voice synthesizer")
     tokensPathOption,
     dataDirOption,
     leadingSilenceOption,
+    apiKeyOption,
     ssmlOption,
 };
 
@@ -160,6 +167,12 @@ rootCommand.SetHandler(
             ? parseResult.GetValueForOption(leadingSilenceOption) ?? 150
             : settings.LeadingSilenceMs ?? 150;
 
+        // Resolve ElevenLabs API key: CLI → settings → env var
+        var apiKey = parseResult.FindResultFor(apiKeyOption) is not null
+            ? parseResult.GetValueForOption(apiKeyOption)
+            : settings.ElevenLabs?.ApiKey
+                ?? Environment.GetEnvironmentVariable("ELEVENLABS_API_KEY");
+
         // Resolve sherpa-onnx model path: dedicated setting or shared --model
         var sherpaModelPath = settings.SherpaOnnx?.ModelPath;
 
@@ -194,9 +207,10 @@ rootCommand.SetHandler(
         }
 
         // Register SherpaOnnx if model provided (--model flag or sherpaOnnx.modelPath in settings)
-        var sherpaModel = engineType == TtsEngineType.SherpaOnnx
-            ? (modelPath ?? sherpaModelPath)
-            : sherpaModelPath;
+        var sherpaModel =
+            engineType == TtsEngineType.SherpaOnnx
+                ? (modelPath ?? sherpaModelPath)
+                : sherpaModelPath;
 
         if (!string.IsNullOrEmpty(sherpaModel))
         {
@@ -218,11 +232,38 @@ rootCommand.SetHandler(
         // Validate SherpaOnnx has model if explicitly requested
         if (engineType == TtsEngineType.SherpaOnnx && string.IsNullOrEmpty(sherpaModel))
         {
-            Console.Error.WriteLine(
-                "Error: SherpaOnnx engine requires --model path to .onnx file"
-            );
+            Console.Error.WriteLine("Error: SherpaOnnx engine requires --model path to .onnx file");
             Console.Error.WriteLine(
                 "Provide --model on the command line or set sherpaOnnx.modelPath in settings.json"
+            );
+            context.ExitCode = 1;
+            return;
+        }
+
+        // Register ElevenLabs if API key is available
+        if (!string.IsNullOrEmpty(apiKey))
+        {
+            TtsEngineFactory.Register(
+                TtsEngineType.ElevenLabs,
+                () =>
+                    new ElevenLabsEngine(
+                        new ElevenLabsOptions
+                        {
+                            ApiKey = apiKey,
+                            VoiceId = settings.ElevenLabs?.VoiceId ?? "21m00Tcm4TlvDq8ikWAM",
+                            ModelId = settings.ElevenLabs?.ModelId ?? "eleven_multilingual_v2",
+                            LeadingSilenceMs = leadingSilenceMs,
+                        }
+                    )
+            );
+        }
+
+        // Validate ElevenLabs has API key if explicitly requested
+        if (engineType == TtsEngineType.ElevenLabs && string.IsNullOrEmpty(apiKey))
+        {
+            Console.Error.WriteLine("Error: ElevenLabs engine requires an API key");
+            Console.Error.WriteLine(
+                "Provide --api-key, set elevenlabs.apiKey in settings.json, or set ELEVENLABS_API_KEY env var"
             );
             context.ExitCode = 1;
             return;

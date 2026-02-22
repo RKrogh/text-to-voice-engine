@@ -31,6 +31,9 @@ dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine piper --mo
 # Run with sherpa-onnx engine (embedded ONNX, no external process)
 dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine sherpaonnx --model path/to/voice.onnx --tokens-path path/to/tokens.txt --data-dir path/to/espeak-ng-data
 
+# Run with ElevenLabs engine (cloud API, requires API key)
+dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine elevenlabs --api-key sk_your_key_here
+
 # Save to file
 dotnet run --project src/TextToVoice.Apps.Console -- "Hello" -o output.wav
 
@@ -71,6 +74,9 @@ texttovoice/
 │   ├── TextToVoice.Engines.SherpaOnnx/ # Embedded ONNX inference (no external process)
 │   │   ├── SherpaOnnxEngine.cs
 │   │   └── SherpaOnnxOptions.cs
+│   ├── TextToVoice.Engines.ElevenLabs/ # ElevenLabs cloud API
+│   │   ├── ElevenLabsEngine.cs
+│   │   └── ElevenLabsOptions.cs
 │   └── TextToVoice.Apps.Console/      # CLI application
 │       ├── Program.cs
 │       └── AppSettings.cs             # Settings file model
@@ -98,6 +104,7 @@ texttovoice/
   - Windows engine: native SSML via `SpeakSsml()` (requires full xmlns namespace)
   - Piper engine: preprocesses SSML to plain text, extracts rate/volume/voice hints
   - SherpaOnnx engine: preprocesses SSML to plain text (same as Piper)
+  - ElevenLabs engine: preprocesses SSML to plain text (same as Piper/SherpaOnnx)
 
 - **TtsEngineFactory** - Creates engines by type with auto-detection:
   - `Register(type, factory)` - Register an engine
@@ -117,11 +124,19 @@ texttovoice/
 | Windows | Windows | ✓ Done | System.Speech (SAPI) |
 | Piper | Cross-platform | ✓ Done | Requires piper executable + model |
 | SherpaOnnx | Cross-platform | ✓ Done | Embedded ONNX inference, no external process |
-| ElevenLabs | Cloud | Planned | High quality, API-based |
+| ElevenLabs | Cloud | ✓ Done | High quality, API-based (paid, free tier: 10k chars/month) |
 
-### Settings File
+### Configuration
 
-Place `settings.json` next to the executable (`AppContext.BaseDirectory`) to set defaults. CLI args override settings. See `AppSettings.cs` for the model. The file is gitignored.
+Uses `Microsoft.Extensions.Configuration` with the standard .NET hierarchy (highest priority wins):
+
+1. CLI arguments (System.CommandLine)
+2. Environment variables (prefixed `TTV_`, e.g. `TTV_ElevenLabs__ApiKey`)
+3. User secrets (`dotnet user-secrets`)
+4. `appsettings.{DOTNET_ENVIRONMENT}.json` (optional)
+5. `appsettings.json` (optional)
+
+Place `appsettings.json` next to the executable (`AppContext.BaseDirectory`). See `AppSettings.cs` for the model. Use `dotnet user-secrets` for API keys and other sensitive values.
 
 ### Piper Setup
 
@@ -147,13 +162,22 @@ To convert raw Piper models, use the sherpa-onnx conversion script (requires `pi
 - **Piper SSML is best-effort**: The preprocessor extracts breaks, rate, volume, and voice hints, but complex SSML (emphasis, phonemes, say-as) is stripped to plain text.
 - **Piper rate mutation**: `ApplyPreprocessResult` modifies `_options.LengthScale` as a side effect that persists after the SSML call. Should save/restore the original value.
 
+### ElevenLabs Setup
+
+Cloud-based high-quality TTS via the ElevenLabs REST API. Requires an API key from [elevenlabs.io](https://elevenlabs.io).
+
+- API key resolution: `--api-key` CLI flag → user secrets → `appsettings.json` → `TTV_ElevenLabs__ApiKey` env var → `ELEVENLABS_API_KEY` env var
+- Default voice: Rachel (`21m00Tcm4TlvDq8ikWAM`)
+- Default model: `eleven_multilingual_v2`
+- Output: PCM 44100 Hz, wrapped in WAV by the engine
+- No external NuGet packages — uses raw `HttpClient`
+
 ### Next Steps (suggested order)
 
 1. **SSML namespace auto-normalization** — Detect `<speak>` without xmlns and add it automatically for Windows engine
-2. **ElevenLabs engine** — Cloud-based high-quality TTS (`TextToVoice.Engines.ElevenLabs`)
-3. **Streaming audio** — Play audio as it's generated rather than waiting for full synthesis
-4. **MP3/OGG export** — Additional output formats beyond WAV
-5. **Multiple language support** — Voice/model selection per language
+2. **Streaming audio** — Play audio as it's generated rather than waiting for full synthesis
+3. **MP3/OGG export** — Additional output formats beyond WAV
+4. **Multiple language support** — Voice/model selection per language
 
 ### Future Investigation
 
@@ -172,3 +196,5 @@ Any of these could be added as a new engine following the `ITtsEngine`/`ISsmlCap
 - System.Speech (in Engines.Windows)
 - org.k2fsa.sherpa.onnx (in Engines.SherpaOnnx)
 - System.CommandLine (in Apps.Console)
+- Microsoft.Extensions.Configuration.* (in Apps.Console — JSON, UserSecrets, EnvironmentVariables, Binder)
+- HttpClient / System.Net.Http (in Engines.ElevenLabs, no external NuGet)

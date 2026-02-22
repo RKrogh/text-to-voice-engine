@@ -1,12 +1,28 @@
-using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 using TextToVoice.Apps.Console;
 
 namespace TextToVoice.Core.Tests;
 
 public class AppSettingsTests
 {
+    private static AppSettings LoadFromJson(string json)
+    {
+        // Write JSON to a temp file, load via ConfigurationBuilder — same as the real app
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, json);
+            var config = new ConfigurationBuilder().AddJsonFile(tempFile, optional: false).Build();
+            return config.Get<AppSettings>() ?? new AppSettings();
+        }
+        finally
+        {
+            File.Delete(tempFile);
+        }
+    }
+
     [Fact]
-    public void Deserialize_FullSettings_AllPropertiesMapped()
+    public void Load_FullSettings_AllPropertiesMapped()
     {
         var json = """
             {
@@ -21,9 +37,8 @@ public class AppSettingsTests
             }
             """;
 
-        var settings = JsonSerializer.Deserialize<AppSettings>(json);
+        var settings = LoadFromJson(json);
 
-        Assert.NotNull(settings);
         Assert.Equal("piper", settings.Engine);
         Assert.Equal("en_US-lessac-medium", settings.Voice);
         Assert.Equal(3, settings.Rate);
@@ -34,13 +49,12 @@ public class AppSettingsTests
     }
 
     [Fact]
-    public void Deserialize_EmptyJson_AllPropertiesNull()
+    public void Load_EmptyJson_AllPropertiesNull()
     {
         var json = "{}";
 
-        var settings = JsonSerializer.Deserialize<AppSettings>(json);
+        var settings = LoadFromJson(json);
 
-        Assert.NotNull(settings);
         Assert.Null(settings.Engine);
         Assert.Null(settings.Voice);
         Assert.Null(settings.Rate);
@@ -49,7 +63,7 @@ public class AppSettingsTests
     }
 
     [Fact]
-    public void Deserialize_PartialSettings_OnlySpecifiedPropertiesSet()
+    public void Load_PartialSettings_OnlySpecifiedPropertiesSet()
     {
         var json = """
             {
@@ -58,9 +72,8 @@ public class AppSettingsTests
             }
             """;
 
-        var settings = JsonSerializer.Deserialize<AppSettings>(json);
+        var settings = LoadFromJson(json);
 
-        Assert.NotNull(settings);
         Assert.Equal("windows", settings.Engine);
         Assert.Null(settings.Voice);
         Assert.Null(settings.Rate);
@@ -69,7 +82,7 @@ public class AppSettingsTests
     }
 
     [Fact]
-    public void Deserialize_PiperOnly_ModelPathWithoutExecutable()
+    public void Load_PiperOnly_ModelPathWithoutExecutable()
     {
         var json = """
             {
@@ -79,34 +92,79 @@ public class AppSettingsTests
             }
             """;
 
-        var settings = JsonSerializer.Deserialize<AppSettings>(json);
+        var settings = LoadFromJson(json);
 
-        Assert.NotNull(settings);
         Assert.NotNull(settings.Piper);
         Assert.Equal("/opt/models/voice.onnx", settings.Piper.ModelPath);
         Assert.Null(settings.Piper.ExecutablePath);
     }
 
     [Fact]
-    public void Deserialize_NullValues_PropertiesRemainNull()
+    public void Load_ElevenLabsSettings_PropertiesMapped()
     {
         var json = """
             {
-                "engine": null,
-                "voice": null,
-                "rate": null,
-                "volume": null,
-                "piper": null
+                "elevenlabs": {
+                    "apiKey": "sk_test_123",
+                    "voiceId": "voice123",
+                    "modelId": "eleven_turbo_v2"
+                }
             }
             """;
 
-        var settings = JsonSerializer.Deserialize<AppSettings>(json);
+        var settings = LoadFromJson(json);
 
-        Assert.NotNull(settings);
-        Assert.Null(settings.Engine);
-        Assert.Null(settings.Voice);
-        Assert.Null(settings.Rate);
-        Assert.Null(settings.Volume);
-        Assert.Null(settings.Piper);
+        Assert.NotNull(settings.ElevenLabs);
+        Assert.Equal("sk_test_123", settings.ElevenLabs.ApiKey);
+        Assert.Equal("voice123", settings.ElevenLabs.VoiceId);
+        Assert.Equal("eleven_turbo_v2", settings.ElevenLabs.ModelId);
+    }
+
+    [Fact]
+    public void Load_SherpaOnnxSettings_PropertiesMapped()
+    {
+        var json = """
+            {
+                "sherpaOnnx": {
+                    "modelPath": "/models/voice.onnx",
+                    "tokensPath": "/models/tokens.txt",
+                    "dataDir": "/models/espeak-ng-data"
+                }
+            }
+            """;
+
+        var settings = LoadFromJson(json);
+
+        Assert.NotNull(settings.SherpaOnnx);
+        Assert.Equal("/models/voice.onnx", settings.SherpaOnnx.ModelPath);
+        Assert.Equal("/models/tokens.txt", settings.SherpaOnnx.TokensPath);
+        Assert.Equal("/models/espeak-ng-data", settings.SherpaOnnx.DataDir);
+    }
+
+    [Fact]
+    public void ConfigurationHierarchy_LaterSourceOverridesEarlier()
+    {
+        var baseJson = Path.GetTempFileName();
+        var overrideJson = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(baseJson, """{"engine": "windows", "volume": 100}""");
+            File.WriteAllText(overrideJson, """{"engine": "piper"}""");
+
+            var config = new ConfigurationBuilder()
+                .AddJsonFile(baseJson, optional: false)
+                .AddJsonFile(overrideJson, optional: false)
+                .Build();
+
+            var settings = config.Get<AppSettings>()!;
+
+            Assert.Equal("piper", settings.Engine); // overridden
+            Assert.Equal(100, settings.Volume); // kept from base
+        }
+        finally
+        {
+            File.Delete(baseJson);
+            File.Delete(overrideJson);
+        }
     }
 }

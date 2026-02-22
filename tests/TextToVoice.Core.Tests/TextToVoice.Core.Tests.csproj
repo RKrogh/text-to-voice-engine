@@ -13,6 +13,9 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.3" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,6 +23,7 @@
     <ProjectReference Include="..\..\src\TextToVoice.Engines.Windows\TextToVoice.Engines.Windows.csproj" />
     <ProjectReference Include="..\..\src\TextToVoice.Engines.Piper\TextToVoice.Engines.Piper.csproj" />
     <ProjectReference Include="..\..\src\TextToVoice.Engines.SherpaOnnx\TextToVoice.Engines.SherpaOnnx.csproj" />
+    <ProjectReference Include="..\..\src\TextToVoice.Engines.ElevenLabs\TextToVoice.Engines.ElevenLabs.csproj" />
     <ProjectReference Include="..\..\src\TextToVoice.Apps.Console\TextToVoice.Apps.Console.csproj" />
   </ItemGroup>
 
