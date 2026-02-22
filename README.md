@@ -8,14 +8,16 @@ A C# text-to-voice module designed as part of a larger pipeline: voice-to-text �
 - Export to WAV files
 - Multiple voice support
 - Adjustable speech rate and volume
-- SSML support (native on Windows, preprocessed on Piper)
+- SSML support (native on Windows, preprocessed on Piper/SherpaOnnx)
+- Embedded ONNX inference via sherpa-onnx (no external process needed)
 - Interface-based design with pluggable engines
 - Settings file for persistent defaults
+- Configurable leading silence to prevent audio clipping
 
 ## Requirements
 
 - .NET 10
-- Windows (for System.Speech engine) or Piper (cross-platform)
+- Windows (for System.Speech engine), Piper (cross-platform), or SherpaOnnx (embedded, cross-platform)
 
 ## Building
 
@@ -63,6 +65,9 @@ dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine windows
 
 # Piper engine (cross-platform)
 dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine piper --model path/to/voice.onnx --piper-path path/to/piper.exe
+
+# SherpaOnnx engine (embedded ONNX, no external process)
+dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine sherpaonnx --model path/to/voice.onnx --tokens-path path/to/tokens.txt --data-dir path/to/espeak-ng-data
 ```
 
 ### SSML input
@@ -89,9 +94,12 @@ dotnet run --project src/TextToVoice.Apps.Console -- --ssml "<speak version='1.0
 | `-r, --rate <-10..10>` | Speech rate (default: 0) |
 | `--volume <0..100>` | Volume level (default: 100) |
 | `--list-voices` | List available voices |
-| `-e, --engine <name>` | TTS engine: auto, windows, piper |
-| `-m, --model <path>` | Path to Piper model file (.onnx) |
+| `-e, --engine <name>` | TTS engine: auto, windows, piper, sherpaonnx |
+| `-m, --model <path>` | Path to voice model file (.onnx) |
 | `--piper-path <path>` | Path to Piper executable |
+| `--tokens-path <path>` | Path to tokens.txt (sherpa-onnx) |
+| `--data-dir <path>` | Path to espeak-ng-data directory (sherpa-onnx) |
+| `--leading-silence <ms>` | Silence before playback to prevent clipping (default: 150, 0 to disable) |
 | `--ssml` | Treat input as SSML (auto-detected if starts with `<speak>`) |
 
 ## Settings File
@@ -104,9 +112,15 @@ Create a `settings.json` in the application directory (next to the executable) t
   "voice": null,
   "rate": 0,
   "volume": 100,
+  "leadingSilenceMs": 150,
   "piper": {
     "modelPath": "C:\\Users\\me\\tools\\piper\\en_US-lessac-medium.onnx",
     "executablePath": "C:\\Users\\me\\tools\\piper\\piper\\piper.exe"
+  },
+  "sherpaOnnx": {
+    "modelPath": "C:\\Users\\me\\models\\en_US-amy-low.onnx",
+    "tokensPath": "C:\\Users\\me\\models\\tokens.txt",
+    "dataDir": "C:\\Users\\me\\models\\espeak-ng-data"
   }
 }
 ```
@@ -123,12 +137,9 @@ The project uses an interface-based design (`ITtsEngine`) with pluggable engine 
 
 - **TextToVoice.Core** — Interfaces and models (platform-agnostic)
 - **TextToVoice.Engines.Windows** — Windows SAPI implementation
-- **TextToVoice.Engines.Piper** — Cross-platform Piper TTS
+- **TextToVoice.Engines.Piper** — Cross-platform Piper TTS (external process)
+- **TextToVoice.Engines.SherpaOnnx** — Embedded ONNX inference (no external process)
 - **TextToVoice.Apps.Console** — CLI application
-
-See individual engine READMEs for setup and usage:
-- [Windows Engine](src/TextToVoice.Engines.Windows/README.md)
-- [Piper Engine](src/TextToVoice.Engines.Piper/README.md)
 
 ### Available Engines
 
@@ -136,6 +147,7 @@ See individual engine READMEs for setup and usage:
 |--------|----------|--------|-------|
 | Windows | Windows | Done | System.Speech (SAPI) |
 | Piper | Cross-platform | Done | Requires piper executable + model |
+| SherpaOnnx | Cross-platform | Done | Embedded ONNX inference, no external process |
 | ElevenLabs | Cloud | Planned | High quality, API-based |
 
 ## Testing

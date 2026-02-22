@@ -39,4 +39,9 @@ public class PiperOptions
     /// Noise width. Default: 0.8.
     /// </summary>
     public float NoiseWidth { get; set; } = 0.8f;
+
+    /// <summary>
+    /// Milliseconds of silence to prepend before playback. Default: 150. Set to 0 to disable.
+    /// </summary>
+    public int LeadingSilenceMs { get; set; } = 150;
 }

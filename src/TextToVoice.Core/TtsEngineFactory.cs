@@ -61,6 +61,7 @@ public static class TtsEngineFactory
             "windows" => TtsEngineType.Windows,
             "piper" => TtsEngineType.Piper,
             "elevenlabs" => TtsEngineType.ElevenLabs,
+            "sherpaonnx" or "sherpa-onnx" or "sherpa" or "onnx" => TtsEngineType.SherpaOnnx,
             _ => throw new ArgumentException($"Unknown engine type: '{name}'"),
         };
     }

@@ -33,6 +33,10 @@ public class PiperEngine : ITtsEngine, ISsmlCapable
         try
         {
             await SaveToFileAsync(text, tempFile, cancellationToken);
+
+            if (_options.LeadingSilenceMs > 0)
+                WavUtils.PrependSilence(tempFile, tempFile, _options.LeadingSilenceMs);
+
             await PlayAudioFileAsync(tempFile, cancellationToken);
         }
         finally

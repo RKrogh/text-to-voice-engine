@@ -19,6 +19,7 @@
     <ProjectReference Include="..\TextToVoice.Core\TextToVoice.Core.csproj" />
     <ProjectReference Include="..\TextToVoice.Engines.Windows\TextToVoice.Engines.Windows.csproj" />
     <ProjectReference Include="..\TextToVoice.Engines.Piper\TextToVoice.Engines.Piper.csproj" />
+    <ProjectReference Include="..\TextToVoice.Engines.SherpaOnnx\TextToVoice.Engines.SherpaOnnx.csproj" />
   </ItemGroup>
 
 </Project>

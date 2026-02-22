@@ -3,6 +3,7 @@ using System.Text.Json;
 using TextToVoice.Apps.Console;
 using TextToVoice.Core;
 using TextToVoice.Engines.Piper;
+using TextToVoice.Engines.SherpaOnnx;
 using TextToVoice.Engines.Windows;
 
 // Load settings from settings.json next to the executable
@@ -63,7 +64,7 @@ var listVoicesOption = new Option<bool>(
 
 var engineOption = new Option<string?>(
     aliases: ["-e", "--engine"],
-    description: "TTS engine to use (auto, windows, piper)"
+    description: "TTS engine to use (auto, windows, piper, sherpaonnx)"
 );
 
 var modelOption = new Option<string?>(
@@ -74,6 +75,21 @@ var modelOption = new Option<string?>(
 var piperPathOption = new Option<string?>(
     aliases: ["--piper-path"],
     description: "Path to the Piper executable (defaults to 'piper' in PATH)"
+);
+
+var tokensPathOption = new Option<string?>(
+    aliases: ["--tokens-path"],
+    description: "Path to tokens.txt file for sherpa-onnx engine"
+);
+
+var dataDirOption = new Option<string?>(
+    aliases: ["--data-dir"],
+    description: "Path to espeak-ng-data directory for sherpa-onnx engine"
+);
+
+var leadingSilenceOption = new Option<int?>(
+    aliases: ["--leading-silence"],
+    description: "Milliseconds of silence before playback to prevent clipping (default: 150, 0 to disable)"
 );
 
 var ssmlOption = new Option<bool>(
@@ -92,6 +108,9 @@ var rootCommand = new RootCommand("Text-to-voice synthesizer")
     engineOption,
     modelOption,
     piperPathOption,
+    tokensPathOption,
+    dataDirOption,
+    leadingSilenceOption,
     ssmlOption,
 };
 
@@ -129,6 +148,21 @@ rootCommand.SetHandler(
             ? parseResult.GetValueForOption(piperPathOption)
             : settings.Piper?.ExecutablePath;
 
+        var tokensPath = parseResult.FindResultFor(tokensPathOption) is not null
+            ? parseResult.GetValueForOption(tokensPathOption)
+            : settings.SherpaOnnx?.TokensPath;
+
+        var dataDir = parseResult.FindResultFor(dataDirOption) is not null
+            ? parseResult.GetValueForOption(dataDirOption)
+            : settings.SherpaOnnx?.DataDir;
+
+        var leadingSilenceMs = parseResult.FindResultFor(leadingSilenceOption) is not null
+            ? parseResult.GetValueForOption(leadingSilenceOption) ?? 150
+            : settings.LeadingSilenceMs ?? 150;
+
+        // Resolve sherpa-onnx model path: dedicated setting or shared --model
+        var sherpaModelPath = settings.SherpaOnnx?.ModelPath;
+
         var engineType = TtsEngineFactory.Parse(engineName);
 
         // Register Piper if model provided or Piper explicitly requested
@@ -138,7 +172,12 @@ rootCommand.SetHandler(
                 TtsEngineType.Piper,
                 () =>
                     new PiperEngine(
-                        new PiperOptions { ModelPath = modelPath, ExecutablePath = piperPath }
+                        new PiperOptions
+                        {
+                            ModelPath = modelPath,
+                            ExecutablePath = piperPath,
+                            LeadingSilenceMs = leadingSilenceMs,
+                        }
                     )
             );
         }
@@ -149,6 +188,41 @@ rootCommand.SetHandler(
             Console.Error.WriteLine("Error: Piper engine requires --model path to .onnx file");
             Console.Error.WriteLine(
                 "Provide --model on the command line or set piper.modelPath in settings.json"
+            );
+            context.ExitCode = 1;
+            return;
+        }
+
+        // Register SherpaOnnx if model provided (--model flag or sherpaOnnx.modelPath in settings)
+        var sherpaModel = engineType == TtsEngineType.SherpaOnnx
+            ? (modelPath ?? sherpaModelPath)
+            : sherpaModelPath;
+
+        if (!string.IsNullOrEmpty(sherpaModel))
+        {
+            TtsEngineFactory.Register(
+                TtsEngineType.SherpaOnnx,
+                () =>
+                    new SherpaOnnxEngine(
+                        new SherpaOnnxOptions
+                        {
+                            ModelPath = sherpaModel,
+                            TokensPath = tokensPath,
+                            DataDir = dataDir,
+                            LeadingSilenceMs = leadingSilenceMs,
+                        }
+                    )
+            );
+        }
+
+        // Validate SherpaOnnx has model if explicitly requested
+        if (engineType == TtsEngineType.SherpaOnnx && string.IsNullOrEmpty(sherpaModel))
+        {
+            Console.Error.WriteLine(
+                "Error: SherpaOnnx engine requires --model path to .onnx file"
+            );
+            Console.Error.WriteLine(
+                "Provide --model on the command line or set sherpaOnnx.modelPath in settings.json"
             );
             context.ExitCode = 1;
             return;

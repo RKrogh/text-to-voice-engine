@@ -1,4 +1,4 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -12,6 +12,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TextToVoice.Apps.Console", "src\TextToVoice.Apps.Console\TextToVoice.Apps.Console.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TextToVoice.Core.Tests", "tests\TextToVoice.Core.Tests\TextToVoice.Core.Tests.csproj", "{C3D4E5F6-A7B8-9012-CDEF-123456789012}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{2E4415FA-CBF4-49E0-AAEB-DD8FD7E00532}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TextToVoice.Engines.SherpaOnnx", "src\TextToVoice.Engines.SherpaOnnx\TextToVoice.Engines.SherpaOnnx.csproj", "{A1D7A794-1113-4CEE-BB42-BF60BD035062}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -39,5 +43,12 @@ Global
 		{C3D4E5F6-A7B8-9012-CDEF-123456789012}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C3D4E5F6-A7B8-9012-CDEF-123456789012}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C3D4E5F6-A7B8-9012-CDEF-123456789012}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1D7A794-1113-4CEE-BB42-BF60BD035062}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1D7A794-1113-4CEE-BB42-BF60BD035062}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1D7A794-1113-4CEE-BB42-BF60BD035062}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1D7A794-1113-4CEE-BB42-BF60BD035062}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{A1D7A794-1113-4CEE-BB42-BF60BD035062} = {2E4415FA-CBF4-49E0-AAEB-DD8FD7E00532}
 	EndGlobalSection
 EndGlobal

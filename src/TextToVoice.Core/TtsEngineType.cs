@@ -16,4 +16,7 @@ public enum TtsEngineType
 
     /// <summary>ElevenLabs cloud API.</summary>
     ElevenLabs,
+
+    /// <summary>Embedded ONNX inference via sherpa-onnx (cross-platform, offline, no external process).</summary>
+    SherpaOnnx,
 }

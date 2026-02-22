@@ -24,4 +24,10 @@ public class TtsOptions
     /// Output audio format for file exports. Default: Wav.
     /// </summary>
     public AudioFormat OutputFormat { get; set; } = AudioFormat.Wav;
+
+    /// <summary>
+    /// Milliseconds of silence to prepend before playback to avoid audio clipping.
+    /// Only affects SpeakAsync (live playback), not file output. Default: 150. Set to 0 to disable.
+    /// </summary>
+    public int LeadingSilenceMs { get; set; } = 150;
 }

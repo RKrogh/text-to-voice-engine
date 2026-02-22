@@ -28,6 +28,9 @@ dotnet run --project src/TextToVoice.Apps.Console -- "Hello world"
 dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine windows
 dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine piper --model path/to/voice.onnx --piper-path path/to/piper.exe
 
+# Run with sherpa-onnx engine (embedded ONNX, no external process)
+dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine sherpaonnx --model path/to/voice.onnx --tokens-path path/to/tokens.txt --data-dir path/to/espeak-ng-data
+
 # Save to file
 dotnet run --project src/TextToVoice.Apps.Console -- "Hello" -o output.wav
 
@@ -36,6 +39,10 @@ dotnet run --project src/TextToVoice.Apps.Console -- --list-voices
 
 # SSML input (auto-detected by <speak> tag, or use --ssml flag)
 dotnet run --project src/TextToVoice.Apps.Console -- "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>Hello<break time='500ms'/>world</speak>"
+
+# Adjust leading silence (prevents audio clipping on playback, default 150ms)
+dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --leading-silence 300
+dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --leading-silence 0  # disable
 ```
 
 ## Architecture
@@ -54,12 +61,16 @@ texttovoice/
 │   │   ├── TtsEngineType.cs           # Engine type enum
 │   │   ├── VoiceInfo.cs               # Voice metadata record
 │   │   ├── TtsOptions.cs              # Configuration class
+│   │   ├── WavUtils.cs               # WAV manipulation (leading silence)
 │   │   └── AudioFormat.cs             # Output format enum
 │   ├── TextToVoice.Engines.Windows/   # Windows SAPI implementation
 │   │   └── SystemSpeechEngine.cs
 │   ├── TextToVoice.Engines.Piper/     # Cross-platform Piper TTS
 │   │   ├── PiperEngine.cs
 │   │   └── PiperOptions.cs
+│   ├── TextToVoice.Engines.SherpaOnnx/ # Embedded ONNX inference (no external process)
+│   │   ├── SherpaOnnxEngine.cs
+│   │   └── SherpaOnnxOptions.cs
 │   └── TextToVoice.Apps.Console/      # CLI application
 │       ├── Program.cs
 │       └── AppSettings.cs             # Settings file model
@@ -86,6 +97,7 @@ texttovoice/
   - `SaveSsmlToFileAsync()` - Save SSML audio to file
   - Windows engine: native SSML via `SpeakSsml()` (requires full xmlns namespace)
   - Piper engine: preprocesses SSML to plain text, extracts rate/volume/voice hints
+  - SherpaOnnx engine: preprocesses SSML to plain text (same as Piper)
 
 - **TtsEngineFactory** - Creates engines by type with auto-detection:
   - `Register(type, factory)` - Register an engine
@@ -104,6 +116,7 @@ texttovoice/
 |--------|----------|--------|-------|
 | Windows | Windows | ✓ Done | System.Speech (SAPI) |
 | Piper | Cross-platform | ✓ Done | Requires piper executable + model |
+| SherpaOnnx | Cross-platform | ✓ Done | Embedded ONNX inference, no external process |
 | ElevenLabs | Cloud | Planned | High quality, API-based |
 
 ### Settings File
@@ -115,6 +128,18 @@ Place `settings.json` next to the executable (`AppContext.BaseDirectory`) to set
 1. Download Piper from https://github.com/rhasspy/piper/releases
 2. Download voice model from https://huggingface.co/rhasspy/piper-voices
 3. Run: `texttovoice "Hello" --engine piper --model path/to/voice.onnx --piper-path path/to/piper.exe`
+
+### SherpaOnnx Setup
+
+Embedded ONNX inference — loads Piper VITS models directly in-process via the `org.k2fsa.sherpa.onnx` NuGet package. No external executables needed.
+
+1. Download a pre-converted Piper model (includes tokens.txt + espeak-ng-data):
+   `wget https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-low.tar.bz2`
+2. Extract: `tar xf vits-piper-en_US-amy-low.tar.bz2`
+3. Run: `texttovoice "Hello" --engine sherpaonnx --model ./vits-piper-en_US-amy-low/en_US-amy-low.onnx`
+   (tokens.txt and espeak-ng-data are auto-detected from the model directory)
+
+To convert raw Piper models, use the sherpa-onnx conversion script (requires `pip install onnx`).
 
 ### Known Issues
 
@@ -132,11 +157,6 @@ Place `settings.json` next to the executable (`AppContext.BaseDirectory`) to set
 
 ### Future Investigation
 
-**Embedded/offline engine (no external process):**
-- Load Piper ONNX models directly via ONNX Runtime in .NET — eliminates piper executable dependency
-- Would make deployment and packaging much simpler
-- Significant architecture change but aligns with the interface pattern
-
 **Expressive/conversational TTS engines to evaluate:**
 - **Sesame CSM** (`sesame/csm-1b`) — Open-source conversational speech model, very natural. PyTorch/GPU, would need Python sidecar or HTTP wrapper
 - **StyleTTS 2** — Open-source, natural prosody, academic project
@@ -150,4 +170,5 @@ Any of these could be added as a new engine following the `ITtsEngine`/`ISsmlCap
 
 - .NET 10
 - System.Speech (in Engines.Windows)
+- org.k2fsa.sherpa.onnx (in Engines.SherpaOnnx)
 - System.CommandLine (in Apps.Console)
