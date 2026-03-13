@@ -26,7 +26,7 @@ public class ElevenLabsEngineTests
 
         Assert.Equal("21m00Tcm4TlvDq8ikWAM", options.VoiceId);
         Assert.Equal("eleven_multilingual_v2", options.ModelId);
-        Assert.Equal("pcm_44100", options.OutputFormat);
+        Assert.Equal("mp3_44100_128", options.OutputFormat);
         Assert.Equal(0.5f, options.Stability);
         Assert.Equal(0.75f, options.SimilarityBoost);
         Assert.Equal(0.0f, options.Style);

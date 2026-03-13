@@ -252,6 +252,7 @@ rootCommand.SetHandler(
                             ApiKey = apiKey,
                             VoiceId = settings.ElevenLabs?.VoiceId ?? "21m00Tcm4TlvDq8ikWAM",
                             ModelId = settings.ElevenLabs?.ModelId ?? "eleven_multilingual_v2",
+                            OutputFormat = settings.ElevenLabs?.OutputFormat ?? "mp3_44100_128",
                             LeadingSilenceMs = leadingSilenceMs,
                         }
                     )

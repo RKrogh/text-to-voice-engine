@@ -30,4 +30,5 @@ public class ElevenLabsSettings
     public string? ApiKey { get; set; }
     public string? VoiceId { get; set; }
     public string? ModelId { get; set; }
+    public string? OutputFormat { get; set; }
 }

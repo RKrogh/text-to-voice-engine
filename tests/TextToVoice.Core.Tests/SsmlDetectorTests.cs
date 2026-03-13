@@ -72,4 +72,68 @@ public class SsmlDetectorTests
 
         Assert.Contains("xml:lang=\"de-DE\"", result);
     }
+
+    [Fact]
+    public void NormalizeNamespace_AddsXmlnsAndVersion_WhenMissing()
+    {
+        var result = SsmlDetector.NormalizeNamespace("<speak>text</speak>");
+
+        Assert.Contains("xmlns='http://www.w3.org/2001/10/synthesis'", result);
+        Assert.Contains("version='1.0'", result);
+        Assert.Contains("text</speak>", result);
+    }
+
+    [Fact]
+    public void NormalizeNamespace_AddsXmlns_KeepsExistingVersion()
+    {
+        var result = SsmlDetector.NormalizeNamespace("<speak version='1.0'>text</speak>");
+
+        Assert.Contains("xmlns='http://www.w3.org/2001/10/synthesis'", result);
+        // Should not duplicate version
+        Assert.Equal(1, CountOccurrences(result, "version="));
+    }
+
+    [Fact]
+    public void NormalizeNamespace_Unchanged_WhenXmlnsPresent()
+    {
+        var ssml = "<speak xmlns='http://www.w3.org/2001/10/synthesis'>text</speak>";
+        var result = SsmlDetector.NormalizeNamespace(ssml);
+
+        Assert.Equal(ssml, result);
+    }
+
+    [Fact]
+    public void NormalizeNamespace_Unchanged_WhenFullyQualified()
+    {
+        var ssml =
+            "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>text</speak>";
+        var result = SsmlDetector.NormalizeNamespace(ssml);
+
+        Assert.Equal(ssml, result);
+    }
+
+    [Fact]
+    public void NormalizeNamespace_ReturnsInput_WhenNotSsml()
+    {
+        var text = "Hello world";
+        Assert.Equal(text, SsmlDetector.NormalizeNamespace(text));
+    }
+
+    [Fact]
+    public void NormalizeNamespace_ReturnsInput_WhenNullOrEmpty()
+    {
+        Assert.Null(SsmlDetector.NormalizeNamespace(null!));
+        Assert.Equal("", SsmlDetector.NormalizeNamespace(""));
+    }
+
+    private static int CountOccurrences(string text, string pattern)
+    {
+        int count = 0, index = 0;
+        while ((index = text.IndexOf(pattern, index, StringComparison.Ordinal)) != -1)
+        {
+            count++;
+            index += pattern.Length;
+        }
+        return count;
+    }
 }

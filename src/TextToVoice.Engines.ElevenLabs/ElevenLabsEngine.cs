@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -46,16 +45,17 @@ public class ElevenLabsEngine : ITtsEngine, ISsmlCapable
 
     public async Task SpeakAsync(string text, CancellationToken cancellationToken = default)
     {
-        var tempFile = Path.Combine(Path.GetTempPath(), $"elevenlabs_{Guid.NewGuid()}.wav");
+        var ext = IsPcmFormat() ? ".wav" : $".{GetFormatExtension()}";
+        var tempFile = Path.Combine(Path.GetTempPath(), $"elevenlabs_{Guid.NewGuid()}{ext}");
 
         try
         {
             await SaveToFileAsync(text, tempFile, cancellationToken);
 
-            if (_options.LeadingSilenceMs > 0)
+            if (IsPcmFormat() && _options.LeadingSilenceMs > 0)
                 WavUtils.PrependSilence(tempFile, tempFile, _options.LeadingSilenceMs);
 
-            await PlayAudioFileAsync(tempFile, cancellationToken);
+            await AudioPlayer.PlayAsync(tempFile, cancellationToken);
         }
         finally
         {
@@ -69,8 +69,13 @@ public class ElevenLabsEngine : ITtsEngine, ISsmlCapable
         CancellationToken cancellationToken = default
     )
     {
-        var pcmData = await CallTtsApiAsync(text, cancellationToken);
-        return WrapPcmInWav(pcmData, sampleRate: 44100);
+        var apiData = await CallTtsApiAsync(text, cancellationToken);
+
+        if (IsPcmFormat())
+            return WrapPcmInWav(apiData, sampleRate: 44100);
+
+        // MP3 and other container formats are returned ready to use
+        return apiData;
     }
 
     public async Task SaveToFileAsync(
@@ -142,32 +147,62 @@ public class ElevenLabsEngine : ITtsEngine, ISsmlCapable
 
     public bool SupportsNativeSsml => false;
 
-    public Task SpeakSsmlAsync(string ssml, CancellationToken cancellationToken = default)
+    public async Task SpeakSsmlAsync(string ssml, CancellationToken cancellationToken = default)
     {
-        var result = _preprocessor.Preprocess(ssml);
-        ApplyPreprocessResult(result);
-        return SpeakAsync(result.PlainText, cancellationToken);
+        var savedSpeed = _speed;
+        var savedVoiceId = _voiceId;
+        try
+        {
+            var result = _preprocessor.Preprocess(ssml);
+            ApplyPreprocessResult(result);
+            await SpeakAsync(result.PlainText, cancellationToken);
+        }
+        finally
+        {
+            _speed = savedSpeed;
+            _voiceId = savedVoiceId;
+        }
     }
 
-    public Task<byte[]> SynthesizeSsmlToAudioAsync(
+    public async Task<byte[]> SynthesizeSsmlToAudioAsync(
         string ssml,
         CancellationToken cancellationToken = default
     )
     {
-        var result = _preprocessor.Preprocess(ssml);
-        ApplyPreprocessResult(result);
-        return SynthesizeToAudioAsync(result.PlainText, cancellationToken);
+        var savedSpeed = _speed;
+        var savedVoiceId = _voiceId;
+        try
+        {
+            var result = _preprocessor.Preprocess(ssml);
+            ApplyPreprocessResult(result);
+            return await SynthesizeToAudioAsync(result.PlainText, cancellationToken);
+        }
+        finally
+        {
+            _speed = savedSpeed;
+            _voiceId = savedVoiceId;
+        }
     }
 
-    public Task SaveSsmlToFileAsync(
+    public async Task SaveSsmlToFileAsync(
         string ssml,
         string filePath,
         CancellationToken cancellationToken = default
     )
     {
-        var result = _preprocessor.Preprocess(ssml);
-        ApplyPreprocessResult(result);
-        return SaveToFileAsync(result.PlainText, filePath, cancellationToken);
+        var savedSpeed = _speed;
+        var savedVoiceId = _voiceId;
+        try
+        {
+            var result = _preprocessor.Preprocess(ssml);
+            ApplyPreprocessResult(result);
+            await SaveToFileAsync(result.PlainText, filePath, cancellationToken);
+        }
+        finally
+        {
+            _speed = savedSpeed;
+            _voiceId = savedVoiceId;
+        }
     }
 
     public void Dispose()
@@ -189,6 +224,18 @@ public class ElevenLabsEngine : ITtsEngine, ISsmlCapable
 
         if (result.VoiceName != null)
             _voiceId = result.VoiceName;
+    }
+
+    private bool IsPcmFormat() =>
+        _options.OutputFormat.StartsWith("pcm_", StringComparison.OrdinalIgnoreCase);
+
+    private string GetFormatExtension()
+    {
+        var format = _options.OutputFormat.ToLowerInvariant();
+        if (format.StartsWith("mp3_")) return "mp3";
+        if (format.StartsWith("pcm_")) return "wav";
+        if (format.StartsWith("ulaw_")) return "wav";
+        return "mp3"; // safe default for unknown formats
     }
 
     private async Task<byte[]> CallTtsApiAsync(string text, CancellationToken cancellationToken)
@@ -254,51 +301,6 @@ public class ElevenLabsEngine : ITtsEngine, ISsmlCapable
         writer.Write(pcmData);
 
         return ms.ToArray();
-    }
-
-    private static async Task PlayAudioFileAsync(
-        string filePath,
-        CancellationToken cancellationToken
-    )
-    {
-        string player;
-        string args;
-
-        if (OperatingSystem.IsWindows())
-        {
-            player = "powershell";
-            args = $"-c \"(New-Object Media.SoundPlayer '{filePath}').PlaySync()\"";
-        }
-        else if (OperatingSystem.IsLinux())
-        {
-            player = "aplay";
-            args = filePath.Contains(' ') ? $"\"{filePath}\"" : filePath;
-        }
-        else if (OperatingSystem.IsMacOS())
-        {
-            player = "afplay";
-            args = filePath.Contains(' ') ? $"\"{filePath}\"" : filePath;
-        }
-        else
-        {
-            throw new PlatformNotSupportedException(
-                "Audio playback not supported on this platform"
-            );
-        }
-
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = player,
-                Arguments = args,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            },
-        };
-
-        process.Start();
-        await process.WaitForExitAsync(cancellationToken);
     }
 
     // JSON models for API responses

@@ -21,10 +21,11 @@ public class ElevenLabsOptions
     public string ModelId { get; set; } = "eleven_multilingual_v2";
 
     /// <summary>
-    /// Output audio format. Default: "pcm_44100" (raw PCM, converted to WAV by the engine).
+    /// Output audio format. Default: "mp3_44100_128" (available on all plans including free tier).
+    /// Use "pcm_44100" for raw PCM (Pro-tier only, auto-wrapped in WAV by the engine).
     /// See https://elevenlabs.io/docs/api-reference/text-to-speech for all formats.
     /// </summary>
-    public string OutputFormat { get; set; } = "pcm_44100";
+    public string OutputFormat { get; set; } = "mp3_44100_128";
 
     /// <summary>
     /// Voice stability (0.0 to 1.0). Lower = more expressive, higher = more consistent.
