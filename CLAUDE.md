@@ -59,7 +59,8 @@ texttovoice/
 │   │   ├── ISsmlPreprocessor.cs       # SSML-to-text preprocessor interface
 │   │   ├── SsmlPreprocessor.cs        # Default SSML preprocessor (XML-based)
 │   │   ├── SsmlPreprocessResult.cs    # Preprocessor output record
-│   │   ├── SsmlDetector.cs            # SSML auto-detection utility
+│   │   ├── SsmlDetector.cs            # SSML auto-detection and namespace normalization
+│   │   ├── AudioPlayer.cs            # Cross-platform audio file playback
 │   │   ├── TtsEngineFactory.cs        # Factory for creating engines
 │   │   ├── TtsEngineType.cs           # Engine type enum
 │   │   ├── VoiceInfo.cs               # Voice metadata record
@@ -101,7 +102,7 @@ texttovoice/
   - `SpeakSsmlAsync()` - Speak SSML markup
   - `SynthesizeSsmlToAudioAsync()` - Synthesize SSML to bytes
   - `SaveSsmlToFileAsync()` - Save SSML audio to file
-  - Windows engine: native SSML via `SpeakSsml()` (requires full xmlns namespace)
+  - Windows engine: native SSML via `SpeakSsml()` (auto-normalizes missing xmlns namespace)
   - Piper engine: preprocesses SSML to plain text, extracts rate/volume/voice hints
   - SherpaOnnx engine: preprocesses SSML to plain text (same as Piper)
   - ElevenLabs engine: preprocesses SSML to plain text (same as Piper/SherpaOnnx)
@@ -158,9 +159,7 @@ To convert raw Piper models, use the sherpa-onnx conversion script (requires `pi
 
 ### Known Issues
 
-- **Windows SSML requires full namespace**: `SpeakSsml()` silently produces no audio if the `<speak>` tag lacks `xmlns='http://www.w3.org/2001/10/synthesis'`. A future improvement would auto-normalize this.
 - **Piper SSML is best-effort**: The preprocessor extracts breaks, rate, volume, and voice hints, but complex SSML (emphasis, phonemes, say-as) is stripped to plain text.
-- **Piper rate mutation**: `ApplyPreprocessResult` modifies `_options.LengthScale` as a side effect that persists after the SSML call. Should save/restore the original value.
 
 ### ElevenLabs Setup
 
@@ -174,10 +173,9 @@ Cloud-based high-quality TTS via the ElevenLabs REST API. Requires an API key fr
 
 ### Next Steps (suggested order)
 
-1. **SSML namespace auto-normalization** — Detect `<speak>` without xmlns and add it automatically for Windows engine
-2. **Streaming audio** — Play audio as it's generated rather than waiting for full synthesis
-3. **MP3/OGG export** — Additional output formats beyond WAV
-4. **Multiple language support** — Voice/model selection per language
+1. **Streaming audio** — Play audio as it's generated rather than waiting for full synthesis
+2. **MP3/OGG export** — Additional output formats beyond WAV
+3. **Multiple language support** — Voice/model selection per language
 
 ### Future Investigation
 

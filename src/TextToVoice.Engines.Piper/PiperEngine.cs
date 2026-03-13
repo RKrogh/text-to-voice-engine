@@ -37,7 +37,7 @@ public class PiperEngine : ITtsEngine, ISsmlCapable
             if (_options.LeadingSilenceMs > 0)
                 WavUtils.PrependSilence(tempFile, tempFile, _options.LeadingSilenceMs);
 
-            await PlayAudioFileAsync(tempFile, cancellationToken);
+            await AudioPlayer.PlayAsync(tempFile, cancellationToken);
         }
         finally
         {
@@ -141,32 +141,56 @@ public class PiperEngine : ITtsEngine, ISsmlCapable
 
     public bool SupportsNativeSsml => false;
 
-    public Task SpeakSsmlAsync(string ssml, CancellationToken cancellationToken = default)
+    public async Task SpeakSsmlAsync(string ssml, CancellationToken cancellationToken = default)
     {
-        var result = _preprocessor.Preprocess(ssml);
-        ApplyPreprocessResult(result);
-        return SpeakAsync(result.PlainText, cancellationToken);
+        var savedLengthScale = _options.LengthScale;
+        try
+        {
+            var result = _preprocessor.Preprocess(ssml);
+            ApplyPreprocessResult(result);
+            await SpeakAsync(result.PlainText, cancellationToken);
+        }
+        finally
+        {
+            _options.LengthScale = savedLengthScale;
+        }
     }
 
-    public Task<byte[]> SynthesizeSsmlToAudioAsync(
+    public async Task<byte[]> SynthesizeSsmlToAudioAsync(
         string ssml,
         CancellationToken cancellationToken = default
     )
     {
-        var result = _preprocessor.Preprocess(ssml);
-        ApplyPreprocessResult(result);
-        return SynthesizeToAudioAsync(result.PlainText, cancellationToken);
+        var savedLengthScale = _options.LengthScale;
+        try
+        {
+            var result = _preprocessor.Preprocess(ssml);
+            ApplyPreprocessResult(result);
+            return await SynthesizeToAudioAsync(result.PlainText, cancellationToken);
+        }
+        finally
+        {
+            _options.LengthScale = savedLengthScale;
+        }
     }
 
-    public Task SaveSsmlToFileAsync(
+    public async Task SaveSsmlToFileAsync(
         string ssml,
         string filePath,
         CancellationToken cancellationToken = default
     )
     {
-        var result = _preprocessor.Preprocess(ssml);
-        ApplyPreprocessResult(result);
-        return SaveToFileAsync(result.PlainText, filePath, cancellationToken);
+        var savedLengthScale = _options.LengthScale;
+        try
+        {
+            var result = _preprocessor.Preprocess(ssml);
+            ApplyPreprocessResult(result);
+            await SaveToFileAsync(result.PlainText, filePath, cancellationToken);
+        }
+        finally
+        {
+            _options.LengthScale = savedLengthScale;
+        }
     }
 
     private void ApplyPreprocessResult(SsmlPreprocessResult result)
@@ -221,51 +245,4 @@ public class PiperEngine : ITtsEngine, ISsmlCapable
     }
 
     private static string Quote(string path) => path.Contains(' ') ? $"\"{path}\"" : path;
-
-    private static async Task PlayAudioFileAsync(
-        string filePath,
-        CancellationToken cancellationToken
-    )
-    {
-        // Platform-specific audio playback
-        string player;
-        string args;
-
-        if (OperatingSystem.IsWindows())
-        {
-            // Use PowerShell to play audio on Windows
-            player = "powershell";
-            args = $"-c \"(New-Object Media.SoundPlayer '{filePath}').PlaySync()\"";
-        }
-        else if (OperatingSystem.IsLinux())
-        {
-            player = "aplay";
-            args = Quote(filePath);
-        }
-        else if (OperatingSystem.IsMacOS())
-        {
-            player = "afplay";
-            args = Quote(filePath);
-        }
-        else
-        {
-            throw new PlatformNotSupportedException(
-                "Audio playback not supported on this platform"
-            );
-        }
-
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = player,
-                Arguments = args,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            },
-        };
-
-        process.Start();
-        await process.WaitForExitAsync(cancellationToken);
-    }
 }

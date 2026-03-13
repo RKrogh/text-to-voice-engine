@@ -126,6 +126,7 @@ public class SystemSpeechEngine : ITtsEngine, ISsmlCapable
         return Task.Run(
             () =>
             {
+                ssml = SsmlDetector.NormalizeNamespace(ssml);
                 var prompt = _synthesizer.SpeakSsmlAsync(ssml);
 
                 while (!prompt.IsCompleted)
@@ -152,6 +153,8 @@ public class SystemSpeechEngine : ITtsEngine, ISsmlCapable
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
+                ssml = SsmlDetector.NormalizeNamespace(ssml);
+
                 using var stream = new MemoryStream();
                 _synthesizer.SetOutputToWaveStream(stream);
                 _synthesizer.SpeakSsml(ssml);
@@ -173,6 +176,8 @@ public class SystemSpeechEngine : ITtsEngine, ISsmlCapable
             () =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                ssml = SsmlDetector.NormalizeNamespace(ssml);
 
                 _synthesizer.SetOutputToWaveFile(filePath);
                 _synthesizer.SpeakSsml(ssml);
