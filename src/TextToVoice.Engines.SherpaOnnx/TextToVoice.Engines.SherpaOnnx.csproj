@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>TextToVoice.Engines.SherpaOnnx</PackageId>
+    <Description>SherpaOnnx engine for TextToVoice. Embedded ONNX inference for cross-platform offline synthesis with no external processes.</Description>
   </PropertyGroup>
 
   <ItemGroup>

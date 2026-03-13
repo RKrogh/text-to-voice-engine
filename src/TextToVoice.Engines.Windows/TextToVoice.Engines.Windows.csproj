@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>TextToVoice.Engines.Windows</PackageId>
+    <Description>Windows SAPI (System.Speech) engine for TextToVoice. Native SSML support with automatic namespace normalization.</Description>
   </PropertyGroup>
 
   <ItemGroup>

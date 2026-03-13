@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>TextToVoice.Engines.ElevenLabs</PackageId>
+    <Description>ElevenLabs engine for TextToVoice. High-quality cloud-based TTS via the ElevenLabs REST API.</Description>
   </PropertyGroup>
 
   <ItemGroup>
