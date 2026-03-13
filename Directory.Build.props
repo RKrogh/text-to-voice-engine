@@ -1,0 +1,14 @@
+<Project>
+
+  <PropertyGroup>
+    <Authors>Robin Krogh</Authors>
+    <PackageProjectUrl>https://github.com/RKrogh/text-to-voice-engine</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/RKrogh/text-to-voice-engine</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>tts;text-to-speech;speech-synthesis;voice;ssml</PackageTags>
+    <Version>0.1.0</Version>
+    <Copyright>Copyright (c) 2026 Robin Krogh</Copyright>
+  </PropertyGroup>
+
+</Project>

@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>TextToVoice.Engines.Piper</PackageId>
+    <Description>Piper TTS engine for TextToVoice. Cross-platform offline synthesis via the Piper executable.</Description>
   </PropertyGroup>
 
   <ItemGroup>

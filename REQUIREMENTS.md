@@ -35,6 +35,7 @@ Living requirements document for the text-to-voice module.
 - [ ] Google Cloud TTS integration
 - [ ] Amazon Polly integration
 - [x] Piper TTS (offline, cross-platform)
+- [x] SherpaOnnx (embedded ONNX inference, cross-platform)
 - [ ] eSpeak (lightweight, cross-platform)
 
 ### Additional Output Formats
@@ -44,8 +45,8 @@ Living requirements document for the text-to-voice module.
 ### Additional Features
 - [x] SSML support (native on Windows, preprocessed on Piper)
 - [x] Settings file for persistent defaults
-- [ ] SSML namespace auto-normalization (Windows requires full xmlns)
-- [ ] ElevenLabs cloud engine
+- [x] SSML namespace auto-normalization (Windows requires full xmlns)
+- [x] ElevenLabs cloud engine
 - [ ] Streaming audio
 - [ ] Voice caching
 - [ ] Multiple language support

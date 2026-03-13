@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>TextToVoice.Core</PackageId>
+    <Description>Interface-based TTS abstraction for .NET. Provides ITtsEngine, SSML detection/preprocessing, and audio utilities with zero dependencies.</Description>
   </PropertyGroup>
 
 </Project>
