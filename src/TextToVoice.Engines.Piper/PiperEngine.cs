@@ -71,21 +71,20 @@ public class PiperEngine : ITtsEngine, ISsmlCapable
         CancellationToken cancellationToken = default
     )
     {
-        var args = BuildArguments(filePath);
-
-        using var process = new Process
+        var psi = new ProcessStartInfo
         {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = _executable,
-                Arguments = args,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            },
+            FileName = _executable,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
         };
+
+        // Use ArgumentList to prevent command injection via file paths.
+        AddArguments(psi.ArgumentList, filePath);
+
+        using var process = new Process { StartInfo = psi };
 
         process.Start();
 
@@ -141,56 +140,41 @@ public class PiperEngine : ITtsEngine, ISsmlCapable
 
     public bool SupportsNativeSsml => false;
 
-    public async Task SpeakSsmlAsync(string ssml, CancellationToken cancellationToken = default)
+    public Task SpeakSsmlAsync(string ssml, CancellationToken cancellationToken = default)
     {
         var savedLengthScale = _options.LengthScale;
-        try
-        {
-            var result = _preprocessor.Preprocess(ssml);
-            ApplyPreprocessResult(result);
-            await SpeakAsync(result.PlainText, cancellationToken);
-        }
-        finally
-        {
-            _options.LengthScale = savedLengthScale;
-        }
+        return SsmlHelper.ExecuteWithPreprocessingAsync(
+            _preprocessor, ssml,
+            ApplyPreprocessResult,
+            text => SpeakAsync(text, cancellationToken),
+            () => _options.LengthScale = savedLengthScale);
     }
 
-    public async Task<byte[]> SynthesizeSsmlToAudioAsync(
+    public Task<byte[]> SynthesizeSsmlToAudioAsync(
         string ssml,
         CancellationToken cancellationToken = default
     )
     {
         var savedLengthScale = _options.LengthScale;
-        try
-        {
-            var result = _preprocessor.Preprocess(ssml);
-            ApplyPreprocessResult(result);
-            return await SynthesizeToAudioAsync(result.PlainText, cancellationToken);
-        }
-        finally
-        {
-            _options.LengthScale = savedLengthScale;
-        }
+        return SsmlHelper.ExecuteWithPreprocessingAsync(
+            _preprocessor, ssml,
+            ApplyPreprocessResult,
+            text => SynthesizeToAudioAsync(text, cancellationToken),
+            () => _options.LengthScale = savedLengthScale);
     }
 
-    public async Task SaveSsmlToFileAsync(
+    public Task SaveSsmlToFileAsync(
         string ssml,
         string filePath,
         CancellationToken cancellationToken = default
     )
     {
         var savedLengthScale = _options.LengthScale;
-        try
-        {
-            var result = _preprocessor.Preprocess(ssml);
-            ApplyPreprocessResult(result);
-            await SaveToFileAsync(result.PlainText, filePath, cancellationToken);
-        }
-        finally
-        {
-            _options.LengthScale = savedLengthScale;
-        }
+        return SsmlHelper.ExecuteWithPreprocessingAsync(
+            _preprocessor, ssml,
+            ApplyPreprocessResult,
+            text => SaveToFileAsync(text, filePath, cancellationToken),
+            () => _options.LengthScale = savedLengthScale);
     }
 
     private void ApplyPreprocessResult(SsmlPreprocessResult result)
@@ -202,7 +186,6 @@ public class PiperEngine : ITtsEngine, ISsmlCapable
             // Invert: length_scale = 1.0 / rateMultiplier
             _options.LengthScale = 1.0f / result.RateMultiplier.Value;
         }
-        // Volume: Piper doesn't support this natively
     }
 
     public void Dispose()
@@ -213,26 +196,23 @@ public class PiperEngine : ITtsEngine, ISsmlCapable
         }
     }
 
-    private string BuildArguments(string outputFile)
+    private void AddArguments(IList<string> args, string outputFile)
     {
-        var args = new List<string>
-        {
-            "--model",
-            Quote(_options.ModelPath),
-            "--output_file",
-            Quote(outputFile),
-            "--length_scale",
-            _options.LengthScale.ToString("F2"),
-            "--noise_scale",
-            _options.NoiseScale.ToString("F2"),
-            "--noise_w",
-            _options.NoiseWidth.ToString("F2"),
-        };
+        args.Add("--model");
+        args.Add(_options.ModelPath);
+        args.Add("--output_file");
+        args.Add(outputFile);
+        args.Add("--length_scale");
+        args.Add(_options.LengthScale.ToString("F2"));
+        args.Add("--noise_scale");
+        args.Add(_options.NoiseScale.ToString("F2"));
+        args.Add("--noise_w");
+        args.Add(_options.NoiseWidth.ToString("F2"));
 
         if (!string.IsNullOrEmpty(_options.ConfigPath))
         {
             args.Add("--config");
-            args.Add(Quote(_options.ConfigPath));
+            args.Add(_options.ConfigPath);
         }
 
         if (_options.SpeakerId > 0)
@@ -240,9 +220,5 @@ public class PiperEngine : ITtsEngine, ISsmlCapable
             args.Add("--speaker");
             args.Add(_options.SpeakerId.ToString());
         }
-
-        return string.Join(" ", args);
     }
-
-    private static string Quote(string path) => path.Contains(' ') ? $"\"{path}\"" : path;
 }

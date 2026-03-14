@@ -7,8 +7,20 @@
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>tts;text-to-speech;speech-synthesis;voice;ssml</PackageTags>
-    <Version>0.1.0</Version>
     <Copyright>Copyright (c) 2026 Robin Krogh</Copyright>
+    <!-- Version is derived from git tags by MinVer (e.g. v0.1.1 → 0.1.1).
+         Without a tag, defaults to 0.1.0-alpha.0 (based on MinVerMinimumMajorMinor). -->
+    <MinVerMinimumMajorMinor>0.1</MinVerMinimumMajorMinor>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Suppress CS1591: interface docs are inherited, no need to duplicate on implementations -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <!-- SourceLink: enables source debugging for NuGet consumers -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+    <PackageReference Include="MinVer" Version="6.0.0" PrivateAssets="All" />
+  </ItemGroup>
 
 </Project>

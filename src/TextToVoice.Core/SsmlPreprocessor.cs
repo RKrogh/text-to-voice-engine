@@ -1,4 +1,5 @@
 using System.Text;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace TextToVoice.Core;
@@ -9,9 +10,17 @@ namespace TextToVoice.Core;
 /// </summary>
 public class SsmlPreprocessor : ISsmlPreprocessor
 {
+    private static readonly XmlReaderSettings SafeXmlSettings = new()
+    {
+        DtdProcessing = DtdProcessing.Prohibit,
+        XmlResolver = null,
+    };
+
+    /// <inheritdoc />
     public SsmlPreprocessResult Preprocess(string ssml)
     {
-        var doc = XDocument.Parse(ssml);
+        using var reader = XmlReader.Create(new StringReader(ssml), SafeXmlSettings);
+        var doc = XDocument.Load(reader);
         var root =
             doc.Root ?? throw new InvalidOperationException("SSML document has no root element.");
 

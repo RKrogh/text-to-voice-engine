@@ -91,4 +91,38 @@ public class ElevenLabsEngineTests
         engine.Dispose();
         engine.Dispose(); // Should not throw
     }
+
+    [Fact]
+    public async Task DisposeAsync_CanBeCalled()
+    {
+        var engine = new ElevenLabsEngine(new ElevenLabsOptions { ApiKey = "test-key" });
+
+        await engine.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task DisposeAsync_CanBeCalledMultipleTimes()
+    {
+        var engine = new ElevenLabsEngine(new ElevenLabsOptions { ApiKey = "test-key" });
+
+        await engine.DisposeAsync();
+        await engine.DisposeAsync(); // Should not throw
+    }
+
+    [Fact]
+    public async Task DisposeAsync_ThenDispose_DoesNotThrow()
+    {
+        var engine = new ElevenLabsEngine(new ElevenLabsOptions { ApiKey = "test-key" });
+
+        await engine.DisposeAsync();
+        engine.Dispose(); // Mixed disposal should not throw
+    }
+
+    [Fact]
+    public void ImplementsIAsyncDisposable()
+    {
+        using var engine = new ElevenLabsEngine(new ElevenLabsOptions { ApiKey = "test-key" });
+
+        Assert.IsAssignableFrom<IAsyncDisposable>(engine);
+    }
 }

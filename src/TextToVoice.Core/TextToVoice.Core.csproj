@@ -8,4 +8,12 @@
     <Description>Interface-based TTS abstraction for .NET. Provides ITtsEngine, SSML detection/preprocessing, and audio utilities with zero dependencies.</Description>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="TextToVoice.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="PACKAGE.md" Pack="true" PackagePath="README.md" />
+  </ItemGroup>
+
 </Project>
