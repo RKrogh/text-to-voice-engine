@@ -1,12 +1,15 @@
+using System.Collections.Concurrent;
+
 namespace TextToVoice.Core;
 
 /// <summary>
 /// Factory for creating TTS engines. Engines must be registered before use.
+/// Thread-safe: registration and creation can happen from any thread.
 /// </summary>
 public static class TtsEngineFactory
 {
-    private static readonly Dictionary<TtsEngineType, Func<ITtsEngine>> _factories = new();
-    private static TtsEngineType _defaultType = TtsEngineType.Auto;
+    private static readonly ConcurrentDictionary<TtsEngineType, Func<ITtsEngine>> _factories = new();
+    private static volatile TtsEngineType _defaultType = TtsEngineType.Auto;
 
     /// <summary>
     /// Registers an engine factory for a specific type.
@@ -70,6 +73,16 @@ public static class TtsEngineFactory
     /// Returns available registered engine types.
     /// </summary>
     public static IEnumerable<TtsEngineType> GetAvailableTypes() => _factories.Keys;
+
+    /// <summary>
+    /// Removes all registered engines and resets the default type.
+    /// Intended for test isolation.
+    /// </summary>
+    internal static void Reset()
+    {
+        _factories.Clear();
+        _defaultType = TtsEngineType.Auto;
+    }
 
     private static TtsEngineType ResolveAutoType()
     {

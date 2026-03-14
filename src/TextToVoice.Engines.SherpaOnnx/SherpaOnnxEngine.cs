@@ -86,30 +86,14 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
         );
     }
 
-    public Task SaveToFileAsync(
+    public async Task SaveToFileAsync(
         string text,
         string filePath,
         CancellationToken cancellationToken = default
     )
     {
-        return Task.Run(
-            () =>
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var audio = _tts.Generate(text, _speed, _speakerId);
-
-                if (Math.Abs(_volumeScale - 1.0f) > 0.001f)
-                {
-                    var samples = audio.Samples;
-                    for (int i = 0; i < samples.Length; i++)
-                        samples[i] *= _volumeScale;
-                }
-
-                audio.SaveToWaveFile(filePath);
-            },
-            cancellationToken
-        );
+        var audioBytes = await SynthesizeToAudioAsync(text, cancellationToken);
+        await File.WriteAllBytesAsync(filePath, audioBytes, cancellationToken);
     }
 
     public IReadOnlyList<VoiceInfo> GetAvailableVoices()
@@ -175,62 +159,41 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
 
     public bool SupportsNativeSsml => false;
 
-    public async Task SpeakSsmlAsync(string ssml, CancellationToken cancellationToken = default)
+    public Task SpeakSsmlAsync(string ssml, CancellationToken cancellationToken = default)
     {
-        var savedSpeed = _speed;
-        var savedVolume = _volumeScale;
-        try
-        {
-            var result = _preprocessor.Preprocess(ssml);
-            ApplyPreprocessResult(result);
-            await SpeakAsync(result.PlainText, cancellationToken);
-        }
-        finally
-        {
-            _speed = savedSpeed;
-            _volumeScale = savedVolume;
-        }
+        var (savedSpeed, savedVolume) = (_speed, _volumeScale);
+        return SsmlHelper.ExecuteWithPreprocessingAsync(
+            _preprocessor, ssml,
+            ApplyPreprocessResult,
+            text => SpeakAsync(text, cancellationToken),
+            () => { _speed = savedSpeed; _volumeScale = savedVolume; });
     }
 
-    public async Task<byte[]> SynthesizeSsmlToAudioAsync(
+    public Task<byte[]> SynthesizeSsmlToAudioAsync(
         string ssml,
         CancellationToken cancellationToken = default
     )
     {
-        var savedSpeed = _speed;
-        var savedVolume = _volumeScale;
-        try
-        {
-            var result = _preprocessor.Preprocess(ssml);
-            ApplyPreprocessResult(result);
-            return await SynthesizeToAudioAsync(result.PlainText, cancellationToken);
-        }
-        finally
-        {
-            _speed = savedSpeed;
-            _volumeScale = savedVolume;
-        }
+        var (savedSpeed, savedVolume) = (_speed, _volumeScale);
+        return SsmlHelper.ExecuteWithPreprocessingAsync(
+            _preprocessor, ssml,
+            ApplyPreprocessResult,
+            text => SynthesizeToAudioAsync(text, cancellationToken),
+            () => { _speed = savedSpeed; _volumeScale = savedVolume; });
     }
 
-    public async Task SaveSsmlToFileAsync(
+    public Task SaveSsmlToFileAsync(
         string ssml,
         string filePath,
         CancellationToken cancellationToken = default
     )
     {
-        var savedSpeed = _speed;
-        var savedVolume = _volumeScale;
-        try
-        {
-            var result = _preprocessor.Preprocess(ssml);
-            ApplyPreprocessResult(result);
-            await SaveToFileAsync(result.PlainText, filePath, cancellationToken);
-        }
-        finally
-        {
-            _speed = savedSpeed;
-            _volumeScale = savedVolume;
-        }
+        var (savedSpeed, savedVolume) = (_speed, _volumeScale);
+        return SsmlHelper.ExecuteWithPreprocessingAsync(
+            _preprocessor, ssml,
+            ApplyPreprocessResult,
+            text => SaveToFileAsync(text, filePath, cancellationToken),
+            () => { _speed = savedSpeed; _volumeScale = savedVolume; });
     }
 
     private void ApplyPreprocessResult(SsmlPreprocessResult result)

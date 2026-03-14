@@ -51,4 +51,17 @@ public class ElevenLabsOptions
     /// Milliseconds of silence to prepend before playback. Default: 150. Set to 0 to disable.
     /// </summary>
     public int LeadingSilenceMs { get; set; } = 150;
+
+    /// <summary>
+    /// Maximum text length in characters before a warning is raised.
+    /// ElevenLabs charges per character — this helps prevent accidental large requests.
+    /// Set to 0 to disable the warning. Default: 5000.
+    /// </summary>
+    public int MaxTextLengthWarning { get; set; } = 5000;
+
+    /// <summary>
+    /// Callback invoked when text exceeds <see cref="MaxTextLengthWarning"/>.
+    /// Default: writes to stderr. Set to null to suppress warnings entirely.
+    /// </summary>
+    public Action<string>? OnWarning { get; set; } = message => Console.Error.WriteLine(message);
 }

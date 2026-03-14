@@ -4,28 +4,35 @@ namespace TextToVoice.Core;
 
 /// <summary>
 /// Platform-specific audio file playback.
+/// Uses argument lists (not shell interpolation) to prevent command injection.
 /// </summary>
 public static class AudioPlayer
 {
     public static async Task PlayAsync(string filePath, CancellationToken cancellationToken = default)
     {
-        string player;
-        string args;
+        var psi = new ProcessStartInfo
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
 
         if (OperatingSystem.IsWindows())
         {
-            player = "powershell";
-            args = $"-c \"(New-Object Media.SoundPlayer '{filePath}').PlaySync()\"";
+            // Use ArgumentList to avoid shell injection via filePath.
+            psi.FileName = "powershell";
+            psi.ArgumentList.Add("-NoProfile");
+            psi.ArgumentList.Add("-Command");
+            psi.ArgumentList.Add($"(New-Object Media.SoundPlayer '{filePath.Replace("'", "''")}').PlaySync()");
         }
         else if (OperatingSystem.IsLinux())
         {
-            player = "aplay";
-            args = Quote(filePath);
+            psi.FileName = "aplay";
+            psi.ArgumentList.Add(filePath);
         }
         else if (OperatingSystem.IsMacOS())
         {
-            player = "afplay";
-            args = Quote(filePath);
+            psi.FileName = "afplay";
+            psi.ArgumentList.Add(filePath);
         }
         else
         {
@@ -34,20 +41,9 @@ public static class AudioPlayer
             );
         }
 
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = player,
-                Arguments = args,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            },
-        };
+        using var process = new Process { StartInfo = psi };
 
         process.Start();
         await process.WaitForExitAsync(cancellationToken);
     }
-
-    private static string Quote(string path) => path.Contains(' ') ? $"\"{path}\"" : path;
 }

@@ -123,4 +123,32 @@ public class SsmlPreprocessorTests
         // 300ms is < 500ms, so should be ellipsis
         Assert.Contains("...", result.PlainText);
     }
+
+    [Fact]
+    public void Preprocess_WithDtd_ThrowsXmlException()
+    {
+        var maliciousSsml = """
+            <?xml version="1.0"?>
+            <!DOCTYPE speak [
+              <!ENTITY xxe SYSTEM "file:///etc/passwd">
+            ]>
+            <speak>&xxe;</speak>
+            """;
+
+        Assert.ThrowsAny<Exception>(() => _preprocessor.Preprocess(maliciousSsml));
+    }
+
+    [Fact]
+    public void Preprocess_WithInternalDtdEntity_ThrowsXmlException()
+    {
+        var ssml = """
+            <?xml version="1.0"?>
+            <!DOCTYPE speak [
+              <!ENTITY test "injected text">
+            ]>
+            <speak>&test;</speak>
+            """;
+
+        Assert.ThrowsAny<Exception>(() => _preprocessor.Preprocess(ssml));
+    }
 }

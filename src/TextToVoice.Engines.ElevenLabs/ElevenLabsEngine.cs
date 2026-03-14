@@ -10,7 +10,7 @@ namespace TextToVoice.Engines.ElevenLabs;
 /// Requires an API key — see https://elevenlabs.io for pricing.
 /// Free tier: 10,000 characters/month. Paid plans start at $5/month.
 /// </summary>
-public class ElevenLabsEngine : ITtsEngine, ISsmlCapable
+public class ElevenLabsEngine : ITtsEngine, ISsmlCapable, IAsyncDisposable
 {
     private const string BaseUrl = "https://api.elevenlabs.io";
 
@@ -147,62 +147,41 @@ public class ElevenLabsEngine : ITtsEngine, ISsmlCapable
 
     public bool SupportsNativeSsml => false;
 
-    public async Task SpeakSsmlAsync(string ssml, CancellationToken cancellationToken = default)
+    public Task SpeakSsmlAsync(string ssml, CancellationToken cancellationToken = default)
     {
-        var savedSpeed = _speed;
-        var savedVoiceId = _voiceId;
-        try
-        {
-            var result = _preprocessor.Preprocess(ssml);
-            ApplyPreprocessResult(result);
-            await SpeakAsync(result.PlainText, cancellationToken);
-        }
-        finally
-        {
-            _speed = savedSpeed;
-            _voiceId = savedVoiceId;
-        }
+        var (savedSpeed, savedVoiceId) = (_speed, _voiceId);
+        return SsmlHelper.ExecuteWithPreprocessingAsync(
+            _preprocessor, ssml,
+            ApplyPreprocessResult,
+            text => SpeakAsync(text, cancellationToken),
+            () => { _speed = savedSpeed; _voiceId = savedVoiceId; });
     }
 
-    public async Task<byte[]> SynthesizeSsmlToAudioAsync(
+    public Task<byte[]> SynthesizeSsmlToAudioAsync(
         string ssml,
         CancellationToken cancellationToken = default
     )
     {
-        var savedSpeed = _speed;
-        var savedVoiceId = _voiceId;
-        try
-        {
-            var result = _preprocessor.Preprocess(ssml);
-            ApplyPreprocessResult(result);
-            return await SynthesizeToAudioAsync(result.PlainText, cancellationToken);
-        }
-        finally
-        {
-            _speed = savedSpeed;
-            _voiceId = savedVoiceId;
-        }
+        var (savedSpeed, savedVoiceId) = (_speed, _voiceId);
+        return SsmlHelper.ExecuteWithPreprocessingAsync(
+            _preprocessor, ssml,
+            ApplyPreprocessResult,
+            text => SynthesizeToAudioAsync(text, cancellationToken),
+            () => { _speed = savedSpeed; _voiceId = savedVoiceId; });
     }
 
-    public async Task SaveSsmlToFileAsync(
+    public Task SaveSsmlToFileAsync(
         string ssml,
         string filePath,
         CancellationToken cancellationToken = default
     )
     {
-        var savedSpeed = _speed;
-        var savedVoiceId = _voiceId;
-        try
-        {
-            var result = _preprocessor.Preprocess(ssml);
-            ApplyPreprocessResult(result);
-            await SaveToFileAsync(result.PlainText, filePath, cancellationToken);
-        }
-        finally
-        {
-            _speed = savedSpeed;
-            _voiceId = savedVoiceId;
-        }
+        var (savedSpeed, savedVoiceId) = (_speed, _voiceId);
+        return SsmlHelper.ExecuteWithPreprocessingAsync(
+            _preprocessor, ssml,
+            ApplyPreprocessResult,
+            text => SaveToFileAsync(text, filePath, cancellationToken),
+            () => { _speed = savedSpeed; _voiceId = savedVoiceId; });
     }
 
     public void Dispose()
@@ -212,6 +191,12 @@ public class ElevenLabsEngine : ITtsEngine, ISsmlCapable
             _httpClient.Dispose();
             _disposed = true;
         }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Dispose();
+        return ValueTask.CompletedTask;
     }
 
     private void ApplyPreprocessResult(SsmlPreprocessResult result)
@@ -240,6 +225,13 @@ public class ElevenLabsEngine : ITtsEngine, ISsmlCapable
 
     private async Task<byte[]> CallTtsApiAsync(string text, CancellationToken cancellationToken)
     {
+        if (_options.MaxTextLengthWarning > 0 && text.Length > _options.MaxTextLengthWarning)
+        {
+            _options.OnWarning?.Invoke(
+                $"Warning: Text is {text.Length:N0} characters. "
+                + $"ElevenLabs charges per character (threshold: {_options.MaxTextLengthWarning:N0}).");
+        }
+
         var url = $"{BaseUrl}/v1/text-to-speech/{_voiceId}?output_format={_options.OutputFormat}";
 
         var payload = new

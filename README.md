@@ -283,4 +283,4 @@ dotnet test
 
 ## License
 
-Open source friendly.
+[MIT](LICENSE)

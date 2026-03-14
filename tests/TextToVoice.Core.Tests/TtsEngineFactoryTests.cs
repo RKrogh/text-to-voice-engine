@@ -1,7 +1,9 @@
 namespace TextToVoice.Core.Tests;
 
-public class TtsEngineFactoryTests
+public class TtsEngineFactoryTests : IDisposable
 {
+    public void Dispose() => TtsEngineFactory.Reset();
+
     [Theory]
     [InlineData(null, TtsEngineType.Auto)]
     [InlineData("", TtsEngineType.Auto)]
@@ -72,6 +74,36 @@ public class TtsEngineFactoryTests
         var types = TtsEngineFactory.GetAvailableTypes();
 
         Assert.Contains(TtsEngineType.Piper, types);
+    }
+
+    [Fact]
+    public async Task ConcurrentRegistration_DoesNotThrow()
+    {
+        var tasks = Enumerable.Range(0, 100).Select(i =>
+            Task.Run(() =>
+            {
+                TtsEngineFactory.Register(TtsEngineType.Piper, () => new StubEngine());
+                _ = TtsEngineFactory.GetAvailableTypes().ToList();
+            }));
+
+        await Task.WhenAll(tasks);
+    }
+
+    [Fact]
+    public async Task ConcurrentCreateAndRegister_DoesNotThrow()
+    {
+        TtsEngineFactory.Register(TtsEngineType.Piper, () => new StubEngine());
+
+        var tasks = Enumerable.Range(0, 100).Select(i =>
+            Task.Run(() =>
+            {
+                if (i % 2 == 0)
+                    TtsEngineFactory.Register(TtsEngineType.Piper, () => new StubEngine());
+                else
+                    TtsEngineFactory.Create(TtsEngineType.Piper).Dispose();
+            }));
+
+        await Task.WhenAll(tasks);
     }
 
     private class StubEngine : ITtsEngine
