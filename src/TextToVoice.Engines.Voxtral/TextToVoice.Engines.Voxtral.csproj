@@ -16,4 +16,8 @@
     <ProjectReference Include="..\TextToVoice.Core\TextToVoice.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="PACKAGE.md" Pack="true" PackagePath="README.md" />
+  </ItemGroup>
+
 </Project>
