@@ -18,22 +18,38 @@ public static class AudioPlayer
 
         if (OperatingSystem.IsWindows())
         {
-            // Use ArgumentList to avoid shell injection via filePath.
+            var escaped = filePath.Replace("'", "''");
             psi.FileName = "powershell";
             psi.ArgumentList.Add("-NoProfile");
             psi.ArgumentList.Add("-Command");
-            psi.ArgumentList.Add($"(New-Object Media.SoundPlayer '{filePath.Replace("'", "''")}').PlaySync()");
+            psi.ArgumentList.Add(
+                "Add-Type -AssemblyName PresentationCore; " +
+                "$p = New-Object System.Windows.Media.MediaPlayer; " +
+                $"$p.Open([uri]'{escaped}'); " +
+                "Start-Sleep -Milliseconds 500; " +
+                "$p.Play(); " +
+                "while ($p.Position -lt $p.NaturalDuration.TimeSpan) { Start-Sleep -Milliseconds 200 }; " +
+                "$p.Close()");
         }
         else if (OperatingSystem.IsLinux())
         {
             if (IsWsl())
             {
-                // WSL: convert path and play via Windows PowerShell
+                // WSL: convert path and play via Windows MediaPlayer (PresentationCore).
+                // Media.SoundPlayer is too restrictive on WAV formats.
                 var winPath = ToWindowsPath(filePath);
+                var escaped = winPath.Replace("'", "''");
                 psi.FileName = "powershell.exe";
                 psi.ArgumentList.Add("-NoProfile");
                 psi.ArgumentList.Add("-Command");
-                psi.ArgumentList.Add($"(New-Object Media.SoundPlayer '{winPath.Replace("'", "''")}').PlaySync()");
+                psi.ArgumentList.Add(
+                    "Add-Type -AssemblyName PresentationCore; " +
+                    "$p = New-Object System.Windows.Media.MediaPlayer; " +
+                    $"$p.Open([uri]'{escaped}'); " +
+                    "Start-Sleep -Milliseconds 500; " +
+                    "$p.Play(); " +
+                    "while ($p.Position -lt $p.NaturalDuration.TimeSpan) { Start-Sleep -Milliseconds 200 }; " +
+                    "$p.Close()");
             }
             else
             {
