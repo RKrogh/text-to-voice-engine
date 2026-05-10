@@ -12,6 +12,8 @@ public class TtsEngineFactoryTests : IDisposable
     [InlineData("windows", TtsEngineType.Windows)]
     [InlineData("piper", TtsEngineType.Piper)]
     [InlineData("elevenlabs", TtsEngineType.ElevenLabs)]
+    [InlineData("voxtral", TtsEngineType.Voxtral)]
+    [InlineData("mistral", TtsEngineType.Voxtral)]
     public void Parse_ValidInput_ReturnsExpectedType(string? input, TtsEngineType expected)
     {
         var result = TtsEngineFactory.Parse(input);

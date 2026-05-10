@@ -60,9 +60,10 @@ public static class WavUtils
         using var writer = new BinaryWriter(output);
 
         // Write RIFF header with updated size
-        var totalFileSize = 4 + (dataOffset - 8) + 8 + newDataSize; // WAVE + pre-data chunks + data header + data
+        // RIFF size = everything after the 8-byte RIFF header: (dataOffset - 8) + 8 + newDataSize
+        var riffSize = (dataOffset - 8) + 8 + newDataSize;
         writer.Write(inputBytes, 0, 4); // "RIFF"
-        writer.Write(totalFileSize);
+        writer.Write(riffSize);
         writer.Write(inputBytes, 8, dataOffset - 8); // everything from "WAVE" up to data chunk ID
 
         // Write data chunk header with updated size
