@@ -65,6 +65,7 @@ public static class TtsEngineFactory
             "piper" => TtsEngineType.Piper,
             "elevenlabs" => TtsEngineType.ElevenLabs,
             "sherpaonnx" or "sherpa-onnx" or "sherpa" or "onnx" => TtsEngineType.SherpaOnnx,
+            "voxtral" or "mistral" => TtsEngineType.Voxtral,
             _ => throw new ArgumentException($"Unknown engine type: '{name}'"),
         };
     }

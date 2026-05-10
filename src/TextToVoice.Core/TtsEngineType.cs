@@ -19,4 +19,7 @@ public enum TtsEngineType
 
     /// <summary>Embedded ONNX inference via sherpa-onnx (cross-platform, offline, no external process).</summary>
     SherpaOnnx,
+
+    /// <summary>Voxtral (Mistral AI) cloud API with streaming and voice cloning.</summary>
+    Voxtral,
 }

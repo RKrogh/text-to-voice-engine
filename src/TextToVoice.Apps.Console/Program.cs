@@ -5,6 +5,7 @@ using TextToVoice.Core;
 using TextToVoice.Engines.ElevenLabs;
 using TextToVoice.Engines.Piper;
 using TextToVoice.Engines.SherpaOnnx;
+using TextToVoice.Engines.Voxtral;
 using TextToVoice.Engines.Windows;
 
 // Build configuration: appsettings.json → appsettings.{env}.json → user secrets → env vars
@@ -65,7 +66,7 @@ var listVoicesOption = new Option<bool>(
 
 var engineOption = new Option<string?>(
     aliases: ["-e", "--engine"],
-    description: "TTS engine to use (auto, windows, piper, sherpaonnx, elevenlabs)"
+    description: "TTS engine to use (auto, windows, piper, sherpaonnx, elevenlabs, voxtral)"
 );
 
 var modelOption = new Option<string?>(
@@ -95,7 +96,12 @@ var leadingSilenceOption = new Option<int?>(
 
 var apiKeyOption = new Option<string?>(
     aliases: ["--api-key"],
-    description: "API key for ElevenLabs engine (also: settings elevenlabs.apiKey or ELEVENLABS_API_KEY env var)"
+    description: "API key for cloud engines (ElevenLabs, Voxtral). Also configurable per-engine in settings or env vars."
+);
+
+var refAudioOption = new Option<string?>(
+    aliases: ["--ref-audio"],
+    description: "Path to reference audio file for Voxtral voice cloning (2-3 seconds of speech)"
 );
 
 var ssmlOption = new Option<bool>(
@@ -118,6 +124,7 @@ var rootCommand = new RootCommand("Text-to-voice synthesizer")
     dataDirOption,
     leadingSilenceOption,
     apiKeyOption,
+    refAudioOption,
     ssmlOption,
 };
 
@@ -167,11 +174,24 @@ rootCommand.SetHandler(
             ? parseResult.GetValueForOption(leadingSilenceOption) ?? 150
             : settings.LeadingSilenceMs ?? 150;
 
-        // Resolve ElevenLabs API key: CLI → settings → env var
-        var apiKey = parseResult.FindResultFor(apiKeyOption) is not null
+        var cliApiKey = parseResult.FindResultFor(apiKeyOption) is not null
             ? parseResult.GetValueForOption(apiKeyOption)
-            : settings.ElevenLabs?.ApiKey
-                ?? Environment.GetEnvironmentVariable("ELEVENLABS_API_KEY");
+            : null;
+
+        // Resolve ElevenLabs API key: CLI → settings → env var
+        var apiKey = cliApiKey
+            ?? settings.ElevenLabs?.ApiKey
+            ?? Environment.GetEnvironmentVariable("ELEVENLABS_API_KEY");
+
+        // Resolve Voxtral ref audio: CLI → settings
+        var refAudioPath = parseResult.FindResultFor(refAudioOption) is not null
+            ? parseResult.GetValueForOption(refAudioOption)
+            : settings.Voxtral?.RefAudioPath;
+
+        // Resolve Voxtral API key: CLI → settings → env var
+        var voxtralApiKey = cliApiKey
+            ?? settings.Voxtral?.ApiKey
+            ?? Environment.GetEnvironmentVariable("MISTRAL_API_KEY");
 
         // Resolve sherpa-onnx model path: dedicated setting or shared --model
         var sherpaModelPath = settings.SherpaOnnx?.ModelPath;
@@ -265,6 +285,43 @@ rootCommand.SetHandler(
             Console.Error.WriteLine("Error: ElevenLabs engine requires an API key");
             Console.Error.WriteLine(
                 "Provide --api-key, set elevenlabs.apiKey in settings.json, or set ELEVENLABS_API_KEY env var"
+            );
+            context.ExitCode = 1;
+            return;
+        }
+
+        // Resolve Voxtral voice: CLI --voice → settings
+        var voxtralVoiceId = parseResult.FindResultFor(voiceOption) is not null
+            ? parseResult.GetValueForOption(voiceOption)
+            : settings.Voxtral?.VoiceId;
+
+        // Register Voxtral if API key is available
+        if (!string.IsNullOrEmpty(voxtralApiKey))
+        {
+            TtsEngineFactory.Register(
+                TtsEngineType.Voxtral,
+                () =>
+                    new VoxtralEngine(
+                        new VoxtralOptions
+                        {
+                            ApiKey = voxtralApiKey,
+                            VoiceId = voxtralVoiceId ?? settings.Voxtral?.VoiceId ?? "gb_jane_neutral",
+                            RefAudioPath = refAudioPath,
+                            ModelId = settings.Voxtral?.ModelId ?? "voxtral-mini-tts-2603",
+                            ResponseFormat = settings.Voxtral?.ResponseFormat ?? "wav",
+                            Stream = settings.Voxtral?.Stream ?? true,
+                            LeadingSilenceMs = leadingSilenceMs,
+                        }
+                    )
+            );
+        }
+
+        // Validate Voxtral has API key if explicitly requested
+        if (engineType == TtsEngineType.Voxtral && string.IsNullOrEmpty(voxtralApiKey))
+        {
+            Console.Error.WriteLine("Error: Voxtral engine requires a Mistral API key");
+            Console.Error.WriteLine(
+                "Provide --api-key, set voxtral.apiKey in settings.json, or set MISTRAL_API_KEY env var"
             );
             context.ExitCode = 1;
             return;

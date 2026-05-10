@@ -42,16 +42,28 @@ public static class WavUtils
         if (dataOffset < 0)
             return;
 
-        var originalDataSize = BitConverter.ToInt32(inputBytes, dataOffset + 4);
+        var declaredDataSize = BitConverter.ToInt32(inputBytes, dataOffset + 4);
         var dataStart = dataOffset + 8;
-        var newDataSize = originalDataSize + silenceBytes;
+        var remainingBytes = inputBytes.Length - dataStart;
+
+        // Handle unknown/streaming size markers (0xFFFFFFFF) and overshoot
+        var actualDataSize = (declaredDataSize <= 0 || declaredDataSize > remainingBytes)
+            ? remainingBytes
+            : declaredDataSize;
+
+        if (actualDataSize <= 0)
+            return;
+
+        var newDataSize = actualDataSize + silenceBytes;
 
         using var output = File.Create(outputPath);
         using var writer = new BinaryWriter(output);
 
         // Write RIFF header with updated size
+        // RIFF size = everything after the 8-byte RIFF header: (dataOffset - 8) + 8 + newDataSize
+        var riffSize = (dataOffset - 8) + 8 + newDataSize;
         writer.Write(inputBytes, 0, 4); // "RIFF"
-        writer.Write(BitConverter.ToInt32(inputBytes, 4) + silenceBytes); // updated file size
+        writer.Write(riffSize);
         writer.Write(inputBytes, 8, dataOffset - 8); // everything from "WAVE" up to data chunk ID
 
         // Write data chunk header with updated size
@@ -62,7 +74,7 @@ public static class WavUtils
         writer.Write(new byte[silenceBytes]);
 
         // Write original audio data
-        writer.Write(inputBytes, dataStart, originalDataSize);
+        writer.Write(inputBytes, dataStart, actualDataSize);
     }
 
     private static int FindChunk(byte[] wav, string chunkId)

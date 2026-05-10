@@ -10,6 +10,7 @@ public class AppSettings
     public PiperSettings? Piper { get; set; }
     public SherpaOnnxSettings? SherpaOnnx { get; set; }
     public ElevenLabsSettings? ElevenLabs { get; set; }
+    public VoxtralSettings? Voxtral { get; set; }
 }
 
 public class PiperSettings
@@ -31,4 +32,14 @@ public class ElevenLabsSettings
     public string? VoiceId { get; set; }
     public string? ModelId { get; set; }
     public string? OutputFormat { get; set; }
+}
+
+public class VoxtralSettings
+{
+    public string? ApiKey { get; set; }
+    public string? VoiceId { get; set; }
+    public string? RefAudioPath { get; set; }
+    public string? ModelId { get; set; }
+    public string? ResponseFormat { get; set; }
+    public bool? Stream { get; set; }
 }
