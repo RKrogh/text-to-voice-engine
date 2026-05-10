@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>TextToVoice.Engines.Voxtral</PackageId>
+    <Description>Voxtral (Mistral AI) engine for TextToVoice. Cloud-based TTS with streaming and voice cloning via the Mistral API.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TextToVoice.Core\TextToVoice.Core.csproj" />
+  </ItemGroup>
+
+</Project>

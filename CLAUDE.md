@@ -31,6 +31,9 @@ dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine piper --mo
 # Run with sherpa-onnx engine (embedded ONNX, no external process)
 dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine sherpaonnx --model path/to/voice.onnx --tokens-path path/to/tokens.txt --data-dir path/to/espeak-ng-data
 
+# Run with Voxtral engine (Mistral AI cloud API, streaming, requires API key)
+dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine voxtral --api-key your_mistral_key
+
 # Run with ElevenLabs engine (cloud API, requires API key)
 dotnet run --project src/TextToVoice.Apps.Console -- "Hello" --engine elevenlabs --api-key sk_your_key_here
 
@@ -78,6 +81,9 @@ texttovoice/
 │   ├── TextToVoice.Engines.ElevenLabs/ # ElevenLabs cloud API
 │   │   ├── ElevenLabsEngine.cs
 │   │   └── ElevenLabsOptions.cs
+│   ├── TextToVoice.Engines.Voxtral/   # Voxtral (Mistral AI) cloud API with streaming
+│   │   ├── VoxtralEngine.cs
+│   │   └── VoxtralOptions.cs
 │   └── TextToVoice.Apps.Console/      # CLI application
 │       ├── Program.cs
 │       └── AppSettings.cs             # Settings file model
@@ -106,6 +112,7 @@ texttovoice/
   - Piper engine: preprocesses SSML to plain text, extracts rate/volume/voice hints
   - SherpaOnnx engine: preprocesses SSML to plain text (same as Piper)
   - ElevenLabs engine: preprocesses SSML to plain text (same as Piper/SherpaOnnx)
+  - Voxtral engine: preprocesses SSML to plain text (same as Piper/SherpaOnnx/ElevenLabs)
 
 - **TtsEngineFactory** - Creates engines by type with auto-detection:
   - `Register(type, factory)` - Register an engine
@@ -122,10 +129,11 @@ texttovoice/
 
 | Engine | Platform | Status | Notes |
 |--------|----------|--------|-------|
+| Voxtral | Cloud | ✓ Done | Mistral AI, streaming SSE, voice cloning, open-source weights (Apache 2.0) |
+| ElevenLabs | Cloud | ✓ Done | High quality, API-based (paid, free tier: 10k chars/month) |
 | Windows | Windows | ✓ Done | System.Speech (SAPI) |
 | Piper | Cross-platform | ✓ Done | Requires piper executable + model |
 | SherpaOnnx | Cross-platform | ✓ Done | Embedded ONNX inference, no external process |
-| ElevenLabs | Cloud | ✓ Done | High quality, API-based (paid, free tier: 10k chars/month) |
 
 ### Configuration
 
@@ -161,6 +169,18 @@ To convert raw Piper models, use the sherpa-onnx conversion script (requires `pi
 
 - **Piper SSML is best-effort**: The preprocessor extracts breaks, rate, volume, and voice hints, but complex SSML (emphasis, phonemes, say-as) is stripped to plain text.
 
+### Voxtral Setup
+
+Cloud-based TTS via the Mistral AI API with streaming support and zero-shot voice cloning. Open-source model weights available under Apache 2.0.
+
+- API key resolution: `--api-key` CLI flag → user secrets → `appsettings.json` → `TTV_Voxtral__ApiKey` env var → `MISTRAL_API_KEY` env var
+- Default model: `voxtral-mini-tts-2603`
+- Output formats: wav (default), mp3, pcm, flac, opus
+- Streaming enabled by default (SSE, reduces time-to-first-byte)
+- Languages: EN, FR, ES, PT, IT, NL, DE, HI, AR
+- Input limit: ~300 words per request
+- No external NuGet packages, uses raw `HttpClient`
+
 ### ElevenLabs Setup
 
 Cloud-based high-quality TTS via the ElevenLabs REST API. Requires an API key from [elevenlabs.io](https://elevenlabs.io).
@@ -195,4 +215,4 @@ Any of these could be added as a new engine following the `ITtsEngine`/`ISsmlCap
 - org.k2fsa.sherpa.onnx (in Engines.SherpaOnnx)
 - System.CommandLine (in Apps.Console)
 - Microsoft.Extensions.Configuration.* (in Apps.Console — JSON, UserSecrets, EnvironmentVariables, Binder)
-- HttpClient / System.Net.Http (in Engines.ElevenLabs, no external NuGet)
+- HttpClient / System.Net.Http (in Engines.ElevenLabs and Engines.Voxtral, no external NuGet)
