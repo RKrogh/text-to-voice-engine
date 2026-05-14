@@ -22,14 +22,7 @@ public static class AudioPlayer
             psi.FileName = "powershell";
             psi.ArgumentList.Add("-NoProfile");
             psi.ArgumentList.Add("-Command");
-            psi.ArgumentList.Add(
-                "Add-Type -AssemblyName PresentationCore; " +
-                "$p = New-Object System.Windows.Media.MediaPlayer; " +
-                $"$p.Open([uri]'{escaped}'); " +
-                "Start-Sleep -Milliseconds 500; " +
-                "$p.Play(); " +
-                "while ($p.Position -lt $p.NaturalDuration.TimeSpan) { Start-Sleep -Milliseconds 200 }; " +
-                "$p.Close()");
+            psi.ArgumentList.Add($"(New-Object System.Media.SoundPlayer '{escaped}').PlaySync()");
         }
         else if (OperatingSystem.IsLinux())
         {
