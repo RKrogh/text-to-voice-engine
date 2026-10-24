@@ -11,7 +11,8 @@ namespace TextToVoice.Engines.SherpaOnnx;
 /// <remarks>
 /// Safe to call from several threads. Each call can carry its own <see cref="SherpaOnnxVoice"/>,
 /// so one multi-speaker model can voice several characters at once; calls into the model are
-/// serialized. The setters change the default voice for calls that do not pass one.
+/// serialized, and disposal waits for a running call to finish. The setters change the default
+/// voice for calls that do not pass one.
 /// </remarks>
 public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
 {
@@ -19,6 +20,7 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
     private readonly OfflineTts _tts;
     private readonly ISsmlPreprocessor _preprocessor;
     private readonly Lock _generate = new();
+    private readonly Lock _settings = new();
     private SherpaOnnxVoice _voice;
     private bool _disposed;
 
@@ -68,7 +70,14 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
     public SherpaOnnxVoice DefaultVoice => _voice;
 
     /// <summary>Number of speakers in the loaded model; 1 for single-speaker models.</summary>
-    public int SpeakerCount => _tts.NumSpeakers;
+    public int SpeakerCount
+    {
+        get
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            return _tts.NumSpeakers;
+        }
+    }
 
     /// <summary>
     /// Synthesizes to raw mono samples in [-1, 1], for callers that feed an audio engine directly
@@ -80,13 +89,18 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         var v = voice ?? _voice;
-        OfflineTtsGeneratedAudio audio;
+        float[] samples;
+        int sampleRate;
         lock (_generate)
         {
-            audio = _tts.Generate(text, v.Speed, v.SpeakerId);
+            // Checked again under the lock: Dispose takes it too, so the model cannot be freed mid-call.
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            var audio = _tts.Generate(text, v.Speed, v.SpeakerId);
+            samples = audio.Samples; // a fresh managed copy on every read
+            sampleRate = audio.SampleRate;
         }
 
-        return new SynthesizedAudio(Pcm.Shape(audio.Samples, _options.Normalize, v.Volume), audio.SampleRate);
+        return new SynthesizedAudio(Pcm.Shape(samples, _options.Normalize, v.Volume), sampleRate);
     }
 
     public Task SpeakAsync(string text, CancellationToken cancellationToken = default) =>
@@ -122,8 +136,21 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
         CancellationToken cancellationToken = default
     ) => SaveToFileAsync(text, filePath, _voice, cancellationToken);
 
+    /// <summary>Writes a WAV file with this call's own voice settings.</summary>
+    public async Task SaveToFileAsync(
+        string text,
+        string filePath,
+        SherpaOnnxVoice voice,
+        CancellationToken cancellationToken = default
+    )
+    {
+        var audioBytes = await SynthesizeToAudioAsync(text, voice, cancellationToken);
+        await File.WriteAllBytesAsync(filePath, audioBytes, cancellationToken);
+    }
+
     public IReadOnlyList<VoiceInfo> GetAvailableVoices()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         var modelName = Path.GetFileNameWithoutExtension(_options.ModelPath);
         var numSpeakers = _tts.NumSpeakers;
 
@@ -151,14 +178,14 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
         var hashIndex = voiceName.LastIndexOf('#');
         if (hashIndex >= 0 && int.TryParse(voiceName[(hashIndex + 1)..], out var id))
         {
-            _voice = _voice with { SpeakerId = id };
+            Update(v => v with { SpeakerId = id });
             return;
         }
 
         // Try parsing as plain speaker ID
         if (int.TryParse(voiceName, out var speakerId))
         {
-            _voice = _voice with { SpeakerId = speakerId };
+            Update(v => v with { SpeakerId = speakerId });
             return;
         }
 
@@ -172,13 +199,13 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
     {
         // Map -10..10 to speed (0.5..2.0, where 1.0 is normal)
         var normalized = (rate + 10) / 20.0f; // 0.0 to 1.0
-        _voice = _voice with { Speed = 0.5f + (normalized * 1.5f) }; // 0.5 to 2.0
+        Update(v => v with { Speed = 0.5f + (normalized * 1.5f) }); // 0.5 to 2.0
     }
 
     public void SetVolume(int volume)
     {
         // Map 0..100 to amplitude scale 0.0..1.0
-        _voice = _voice with { Volume = Math.Clamp(volume / 100.0f, 0.0f, 1.0f) };
+        Update(v => v with { Volume = Math.Clamp(volume / 100.0f, 0.0f, 1.0f) });
     }
 
     // ISsmlCapable. The prosody in the markup applies to that call only; nothing is changed on
@@ -213,10 +240,23 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
 
     public void Dispose()
     {
-        if (!_disposed)
+        lock (_generate)
         {
-            _tts.Dispose();
+            if (_disposed)
+                return;
+
             _disposed = true;
+            _tts.Dispose();
+        }
+    }
+
+    // Readers take the current value without locking; the lock only keeps two setters from
+    // overwriting each other's change.
+    private void Update(Func<SherpaOnnxVoice, SherpaOnnxVoice> change)
+    {
+        lock (_settings)
+        {
+            _voice = change(_voice);
         }
     }
 
@@ -235,7 +275,8 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
         return (result.PlainText, voice);
     }
 
-    private async Task SpeakAsync(string text, SherpaOnnxVoice voice, CancellationToken cancellationToken)
+    /// <summary>Plays the text through the platform audio player with this call's own voice.</summary>
+    public async Task SpeakAsync(string text, SherpaOnnxVoice voice, CancellationToken cancellationToken = default)
     {
         var tempFile = Path.Combine(Path.GetTempPath(), $"sherpa_{Guid.NewGuid()}.wav");
 
@@ -253,16 +294,5 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
             if (File.Exists(tempFile))
                 File.Delete(tempFile);
         }
-    }
-
-    private async Task SaveToFileAsync(
-        string text,
-        string filePath,
-        SherpaOnnxVoice voice,
-        CancellationToken cancellationToken
-    )
-    {
-        var audioBytes = await SynthesizeToAudioAsync(text, voice, cancellationToken);
-        await File.WriteAllBytesAsync(filePath, audioBytes, cancellationToken);
     }
 }

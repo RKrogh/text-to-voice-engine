@@ -66,6 +66,12 @@ SynthesizedAudio audio = engine.Synthesize("Two bandits on my six.", pilot);
 
 Calls into the model are serialized, so parallel calls are safe but do not run faster.
 
+Kokoro support covers the English models (for example `kokoro-en-v0_19`). The multilingual
+Kokoro v1.0 models also need a lexicon and dictionary directory, which are not exposed yet.
+
+Since 0.3.0, `SetVolume` and `SherpaOnnxVoice.Volume` change the output level. Earlier versions
+normalised every line to full scale after applying volume, so volume had no effect.
+
 ## Requirements
 
 - .NET 10+
