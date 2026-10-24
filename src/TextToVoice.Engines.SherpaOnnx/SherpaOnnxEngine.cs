@@ -5,16 +5,21 @@ namespace TextToVoice.Engines.SherpaOnnx;
 
 /// <summary>
 /// Embedded TTS engine using sherpa-onnx for in-process ONNX inference.
-/// Loads Piper VITS models directly — no external executable needed.
+/// Loads Piper VITS models (or Kokoro models when <see cref="SherpaOnnxOptions.VoicesPath"/> is
+/// set) directly — no external executable needed.
 /// </summary>
+/// <remarks>
+/// Safe to call from several threads. Each call can carry its own <see cref="SherpaOnnxVoice"/>,
+/// so one multi-speaker model can voice several characters at once; calls into the model are
+/// serialized. The setters change the default voice for calls that do not pass one.
+/// </remarks>
 public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
 {
     private readonly SherpaOnnxOptions _options;
     private readonly OfflineTts _tts;
     private readonly ISsmlPreprocessor _preprocessor;
-    private int _speakerId;
-    private float _speed;
-    private float _volumeScale;
+    private readonly Lock _generate = new();
+    private SherpaOnnxVoice _voice;
     private bool _disposed;
 
     public SherpaOnnxEngine(SherpaOnnxOptions options, ISsmlPreprocessor? preprocessor = null)
@@ -25,10 +30,8 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
             throw new ArgumentException("ModelPath is required", nameof(options));
 
         _preprocessor = preprocessor ?? new SsmlPreprocessor();
-        _speakerId = options.SpeakerId;
         // speed is inverse of length scale: speed 2.0 = length_scale 0.5
-        _speed = 1.0f / options.LengthScale;
-        _volumeScale = 1.0f;
+        _voice = new SherpaOnnxVoice(options.SpeakerId, 1.0f / options.LengthScale);
 
         var modelDir = Path.GetDirectoryName(Path.GetFullPath(options.ModelPath)) ?? ".";
         var tokensPath = options.TokensPath
@@ -37,64 +40,87 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
             ?? Path.Combine(modelDir, "espeak-ng-data");
 
         var config = new OfflineTtsConfig();
-        config.Model.Vits.Model = options.ModelPath;
-        config.Model.Vits.Tokens = tokensPath;
-        config.Model.Vits.DataDir = dataDir;
-        config.Model.Vits.NoiseScale = options.NoiseScale;
-        config.Model.Vits.NoiseScaleW = options.NoiseScaleW;
-        config.Model.Vits.LengthScale = options.LengthScale;
+        if (options.VoicesPath is { } voices)
+        {
+            config.Model.Kokoro.Model = options.ModelPath;
+            config.Model.Kokoro.Voices = voices;
+            config.Model.Kokoro.Tokens = tokensPath;
+            config.Model.Kokoro.DataDir = dataDir;
+            config.Model.Kokoro.LengthScale = options.LengthScale;
+        }
+        else
+        {
+            config.Model.Vits.Model = options.ModelPath;
+            config.Model.Vits.Tokens = tokensPath;
+            config.Model.Vits.DataDir = dataDir;
+            config.Model.Vits.NoiseScale = options.NoiseScale;
+            config.Model.Vits.NoiseScaleW = options.NoiseScaleW;
+            config.Model.Vits.LengthScale = options.LengthScale;
+        }
+
         config.Model.NumThreads = options.NumThreads;
         config.Model.Provider = "cpu";
 
         _tts = new OfflineTts(config);
     }
 
-    public async Task SpeakAsync(string text, CancellationToken cancellationToken = default)
+    /// <summary>The voice used by calls that do not pass one. Changed by the setters.</summary>
+    public SherpaOnnxVoice DefaultVoice => _voice;
+
+    /// <summary>Number of speakers in the loaded model; 1 for single-speaker models.</summary>
+    public int SpeakerCount => _tts.NumSpeakers;
+
+    /// <summary>
+    /// Synthesizes to raw mono samples in [-1, 1], for callers that feed an audio engine directly
+    /// instead of going through WAV bytes.
+    /// </summary>
+    public SynthesizedAudio Synthesize(string text, SherpaOnnxVoice? voice = null)
     {
-        var tempFile = Path.Combine(Path.GetTempPath(), $"sherpa_{Guid.NewGuid()}.wav");
+        ArgumentNullException.ThrowIfNull(text);
+        ObjectDisposedException.ThrowIf(_disposed, this);
 
-        try
+        var v = voice ?? _voice;
+        OfflineTtsGeneratedAudio audio;
+        lock (_generate)
         {
-            await SaveToFileAsync(text, tempFile, cancellationToken);
-
-            if (_options.LeadingSilenceMs > 0)
-                WavUtils.PrependSilence(tempFile, tempFile, _options.LeadingSilenceMs);
-
-            await AudioPlayer.PlayAsync(tempFile, cancellationToken);
+            audio = _tts.Generate(text, v.Speed, v.SpeakerId);
         }
-        finally
-        {
-            if (File.Exists(tempFile))
-                File.Delete(tempFile);
-        }
+
+        return new SynthesizedAudio(Pcm.Shape(audio.Samples, _options.Normalize, v.Volume), audio.SampleRate);
     }
+
+    public Task SpeakAsync(string text, CancellationToken cancellationToken = default) =>
+        SpeakAsync(text, _voice, cancellationToken);
 
     public Task<byte[]> SynthesizeToAudioAsync(
         string text,
         CancellationToken cancellationToken = default
+    ) => SynthesizeToAudioAsync(text, _voice, cancellationToken);
+
+    /// <summary>Synthesizes a 16-bit mono WAV with this call's own voice settings.</summary>
+    public Task<byte[]> SynthesizeToAudioAsync(
+        string text,
+        SherpaOnnxVoice voice,
+        CancellationToken cancellationToken = default
     )
     {
+        ArgumentNullException.ThrowIfNull(voice);
         return Task.Run(
             () =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-
-                var audio = _tts.Generate(text, _speed, _speakerId);
-                return BuildWav(audio.Samples, audio.SampleRate);
+                var audio = Synthesize(text, voice);
+                return Pcm.ToWav(audio.Samples, audio.SampleRate);
             },
             cancellationToken
         );
     }
 
-    public async Task SaveToFileAsync(
+    public Task SaveToFileAsync(
         string text,
         string filePath,
         CancellationToken cancellationToken = default
-    )
-    {
-        var audioBytes = await SynthesizeToAudioAsync(text, cancellationToken);
-        await File.WriteAllBytesAsync(filePath, audioBytes, cancellationToken);
-    }
+    ) => SaveToFileAsync(text, filePath, _voice, cancellationToken);
 
     public IReadOnlyList<VoiceInfo> GetAvailableVoices()
     {
@@ -125,14 +151,14 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
         var hashIndex = voiceName.LastIndexOf('#');
         if (hashIndex >= 0 && int.TryParse(voiceName[(hashIndex + 1)..], out var id))
         {
-            _speakerId = id;
+            _voice = _voice with { SpeakerId = id };
             return;
         }
 
         // Try parsing as plain speaker ID
         if (int.TryParse(voiceName, out var speakerId))
         {
-            _speakerId = speakerId;
+            _voice = _voice with { SpeakerId = speakerId };
             return;
         }
 
@@ -146,27 +172,24 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
     {
         // Map -10..10 to speed (0.5..2.0, where 1.0 is normal)
         var normalized = (rate + 10) / 20.0f; // 0.0 to 1.0
-        _speed = 0.5f + (normalized * 1.5f); // 0.5 to 2.0
+        _voice = _voice with { Speed = 0.5f + (normalized * 1.5f) }; // 0.5 to 2.0
     }
 
     public void SetVolume(int volume)
     {
         // Map 0..100 to amplitude scale 0.0..1.0
-        _volumeScale = Math.Clamp(volume / 100.0f, 0.0f, 1.0f);
+        _voice = _voice with { Volume = Math.Clamp(volume / 100.0f, 0.0f, 1.0f) };
     }
 
-    // ISsmlCapable
+    // ISsmlCapable. The prosody in the markup applies to that call only; nothing is changed on
+    // the engine, so concurrent plain calls are unaffected.
 
     public bool SupportsNativeSsml => false;
 
     public Task SpeakSsmlAsync(string ssml, CancellationToken cancellationToken = default)
     {
-        var (savedSpeed, savedVolume) = (_speed, _volumeScale);
-        return SsmlHelper.ExecuteWithPreprocessingAsync(
-            _preprocessor, ssml,
-            ApplyPreprocessResult,
-            text => SpeakAsync(text, cancellationToken),
-            () => { _speed = savedSpeed; _volumeScale = savedVolume; });
+        var (text, voice) = Preprocess(ssml);
+        return SpeakAsync(text, voice, cancellationToken);
     }
 
     public Task<byte[]> SynthesizeSsmlToAudioAsync(
@@ -174,12 +197,8 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
         CancellationToken cancellationToken = default
     )
     {
-        var (savedSpeed, savedVolume) = (_speed, _volumeScale);
-        return SsmlHelper.ExecuteWithPreprocessingAsync(
-            _preprocessor, ssml,
-            ApplyPreprocessResult,
-            text => SynthesizeToAudioAsync(text, cancellationToken),
-            () => { _speed = savedSpeed; _volumeScale = savedVolume; });
+        var (text, voice) = Preprocess(ssml);
+        return SynthesizeToAudioAsync(text, voice, cancellationToken);
     }
 
     public Task SaveSsmlToFileAsync(
@@ -188,26 +207,8 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
         CancellationToken cancellationToken = default
     )
     {
-        var (savedSpeed, savedVolume) = (_speed, _volumeScale);
-        return SsmlHelper.ExecuteWithPreprocessingAsync(
-            _preprocessor, ssml,
-            ApplyPreprocessResult,
-            text => SaveToFileAsync(text, filePath, cancellationToken),
-            () => { _speed = savedSpeed; _volumeScale = savedVolume; });
-    }
-
-    private void ApplyPreprocessResult(SsmlPreprocessResult result)
-    {
-        if (result.RateMultiplier.HasValue)
-        {
-            // SSML rate multiplier: >1.0 = faster. sherpa-onnx speed: >1.0 = faster. Direct mapping.
-            _speed = result.RateMultiplier.Value;
-        }
-
-        if (result.Volume.HasValue)
-        {
-            _volumeScale = Math.Clamp(result.Volume.Value / 100.0f, 0.0f, 1.0f);
-        }
+        var (text, voice) = Preprocess(ssml);
+        return SaveToFileAsync(text, filePath, voice, cancellationToken);
     }
 
     public void Dispose()
@@ -219,59 +220,49 @@ public class SherpaOnnxEngine : ITtsEngine, ISsmlCapable
         }
     }
 
-    private byte[] BuildWav(float[] samples, int sampleRate)
+    private (string Text, SherpaOnnxVoice Voice) Preprocess(string ssml)
     {
-        // Apply volume scaling
-        if (Math.Abs(_volumeScale - 1.0f) > 0.001f)
-        {
-            for (int i = 0; i < samples.Length; i++)
-                samples[i] *= _volumeScale;
-        }
+        var result = _preprocessor.Preprocess(ssml);
+        var voice = _voice;
 
-        // Convert float samples to 16-bit PCM WAV
-        var numSamples = samples.Length;
-        var bytesPerSample = 2; // 16-bit
-        var dataSize = numSamples * bytesPerSample;
-        var headerSize = 44;
+        // SSML rate multiplier: >1.0 = faster. sherpa-onnx speed: >1.0 = faster. Direct mapping.
+        if (result.RateMultiplier is { } rate)
+            voice = voice with { Speed = rate };
 
-        using var ms = new MemoryStream(headerSize + dataSize);
-        using var writer = new BinaryWriter(ms);
+        if (result.Volume is { } volume)
+            voice = voice with { Volume = Math.Clamp(volume / 100.0f, 0.0f, 1.0f) };
 
-        // RIFF header
-        writer.Write("RIFF"u8);
-        writer.Write(36 + dataSize);
-        writer.Write("WAVE"u8);
-
-        // fmt chunk
-        writer.Write("fmt "u8);
-        writer.Write(16); // chunk size
-        writer.Write((short)1); // PCM format
-        writer.Write((short)1); // mono
-        writer.Write(sampleRate);
-        writer.Write(sampleRate * bytesPerSample); // byte rate
-        writer.Write((short)bytesPerSample); // block align
-        writer.Write((short)16); // bits per sample
-
-        // data chunk
-        writer.Write("data"u8);
-        writer.Write(dataSize);
-
-        // Normalize and write samples
-        float maxAbs = 0;
-        for (int i = 0; i < numSamples; i++)
-        {
-            var abs = Math.Abs(samples[i]);
-            if (abs > maxAbs) maxAbs = abs;
-        }
-
-        var scale = maxAbs > 0 ? 32767.0f / maxAbs : 1.0f;
-        for (int i = 0; i < numSamples; i++)
-        {
-            var sample = (short)Math.Clamp(samples[i] * scale, short.MinValue, short.MaxValue);
-            writer.Write(sample);
-        }
-
-        return ms.ToArray();
+        return (result.PlainText, voice);
     }
 
+    private async Task SpeakAsync(string text, SherpaOnnxVoice voice, CancellationToken cancellationToken)
+    {
+        var tempFile = Path.Combine(Path.GetTempPath(), $"sherpa_{Guid.NewGuid()}.wav");
+
+        try
+        {
+            await SaveToFileAsync(text, tempFile, voice, cancellationToken);
+
+            if (_options.LeadingSilenceMs > 0)
+                WavUtils.PrependSilence(tempFile, tempFile, _options.LeadingSilenceMs);
+
+            await AudioPlayer.PlayAsync(tempFile, cancellationToken);
+        }
+        finally
+        {
+            if (File.Exists(tempFile))
+                File.Delete(tempFile);
+        }
+    }
+
+    private async Task SaveToFileAsync(
+        string text,
+        string filePath,
+        SherpaOnnxVoice voice,
+        CancellationToken cancellationToken
+    )
+    {
+        var audioBytes = await SynthesizeToAudioAsync(text, voice, cancellationToken);
+        await File.WriteAllBytesAsync(filePath, audioBytes, cancellationToken);
+    }
 }

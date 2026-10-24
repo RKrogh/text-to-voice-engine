@@ -1,6 +1,6 @@
 # TextToVoice.Engines.SherpaOnnx
 
-Embedded ONNX inference engine for TextToVoice. Runs Piper VITS models directly in-process — no external executables needed.
+Embedded ONNX inference engine for TextToVoice. Runs Piper VITS and Kokoro models directly in-process — no external executables needed.
 
 ## Installation
 
@@ -43,8 +43,28 @@ var options = new SherpaOnnxOptions
     LengthScale = 1.0f,                  // speech speed
     NumThreads = 1,                       // ONNX inference threads
     LeadingSilenceMs = 150,              // silence before playback (0 to disable)
+    Normalize = true,                     // peak-normalise each line before volume
+    VoicesPath = null,                    // set to a Kokoro voices.bin to load a Kokoro model
 };
 ```
+
+## Several voices from one engine
+
+Pass a `SherpaOnnxVoice` per call. One multi-speaker model (for example `libritts_r`, 904
+speakers) can then voice a whole cast, from several threads at once, without touching the
+engine's default voice:
+
+```csharp
+var helm = new SherpaOnnxVoice(SpeakerId: 40);
+var pilot = new SherpaOnnxVoice(SpeakerId: 120, Speed: 1.1f, Volume: 0.8f);
+
+byte[] wav = await engine.SynthesizeToAudioAsync("Helm, aye.", helm);
+
+// Raw mono samples in [-1, 1], for feeding an audio engine directly.
+SynthesizedAudio audio = engine.Synthesize("Two bandits on my six.", pilot);
+```
+
+Calls into the model are serialized, so parallel calls are safe but do not run faster.
 
 ## Requirements
 
