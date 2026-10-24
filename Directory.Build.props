@@ -1,15 +1,17 @@
 <Project>
 
   <PropertyGroup>
-    <Authors>Robin Krogh</Authors>
+    <Authors>Robert Krogh</Authors>
     <PackageProjectUrl>https://github.com/RKrogh/text-to-voice-engine</PackageProjectUrl>
     <RepositoryUrl>https://github.com/RKrogh/text-to-voice-engine</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageTags>tts;text-to-speech;speech-synthesis;voice;ssml</PackageTags>
-    <Copyright>Copyright (c) 2026 Robin Krogh</Copyright>
-    <!-- Version is derived from git tags by MinVer (e.g. v0.1.1 → 0.1.1).
+    <Copyright>Copyright (c) 2026 Robert Krogh</Copyright>
+    <!-- Version is derived from git tags by MinVer (v0.3.0 → 0.3.0). The prefix must be set:
+         without it MinVer ignores v-tags and every release packed 0.1.0-alpha.0.N.
          Without a tag, defaults to 0.1.0-alpha.0 (based on MinVerMinimumMajorMinor). -->
+    <MinVerTagPrefix>v</MinVerTagPrefix>
     <MinVerMinimumMajorMinor>0.1</MinVerMinimumMajorMinor>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- Suppress CS1591: interface docs are inherited, no need to duplicate on implementations -->
@@ -19,7 +21,7 @@
 
   <!-- SourceLink: enables source debugging for NuGet consumers -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.402" PrivateAssets="All" />
     <PackageReference Include="MinVer" Version="6.0.0" PrivateAssets="All" />
   </ItemGroup>
 

@@ -9,12 +9,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # MinVer needs full history to resolve version from git tags
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -29,6 +29,18 @@ jobs:
 
       - name: Pack
         run: dotnet pack --no-build -c Release -o ./artifacts
+
+      # Fail rather than publish a version the tag did not ask for.
+      - name: Check package version matches the tag
+        run: |
+          expected="${GITHUB_REF_NAME#v}"
+          ls ./artifacts/*.nupkg
+          for pkg in ./artifacts/*.nupkg; do
+            case "$pkg" in
+              *".$expected.nupkg") ;;
+              *) echo "::error::$pkg does not carry version $expected"; exit 1 ;;
+            esac
+          done
 
       - name: Push to NuGet
         run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

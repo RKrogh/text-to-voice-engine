@@ -24,6 +24,18 @@ public class SherpaOnnxOptions
     public string? DataDir { get; set; }
 
     /// <summary>
+    /// Path to a Kokoro model's voices.bin. When set, <see cref="ModelPath"/> is loaded as a
+    /// Kokoro model instead of Piper VITS. Default: null.
+    /// </summary>
+    public string? VoicesPath { get; set; }
+
+    /// <summary>
+    /// Peak-normalise every line to full scale before volume is applied. Default: true. Turn it
+    /// off to keep the model's own loudness, so short and long lines keep their natural balance.
+    /// </summary>
+    public bool Normalize { get; set; } = true;
+
+    /// <summary>
     /// Speaker ID for multi-speaker models. Default: 0.
     /// </summary>
     public int SpeakerId { get; set; } = 0;
